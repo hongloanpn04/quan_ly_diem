@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-3">
+    <a href="/" class="btn btn-outline-secondary btn-sm">⬅ Quay lại danh sách lớp</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="fw-bold text-primary mb-0">Sổ Nhập Điểm - Lớp {{ current_class['ma_lop'] }}</h3>
+        <small class="text-muted">{{ current_class['ten_lop'] }} | Sĩ số: {{ students|length }} SV</small>
+    </div>
+    <div>
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+            + Thêm Sinh Viên Mới
+        </button>
+    </div>
+</div>
+
+<!-- Thanh tìm kiếm -->
+<form method="GET" class="d-flex mb-3">
+    <input type="text" name="search" class="form-control me-2" placeholder="Tìm theo tên hoặc MSSV..." value="{{ search_query }}">
+    <button class="btn btn-primary" type="submit">Tìm</button>
+    {% if search_query %}
+        <a href="/class/{{ current_class['id'] }}" class="btn btn-secondary ms-2">Xóa bộ lọc</a>
+    {% endif %}
+</form>
+
+<!-- BẢNG NHẬP ĐIỂM DÀNH CHO GIÁO VIÊN -->
+<form action="/class/{{ current_class['id'] }}/update-grades" method="POST">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <span class="fw-bold">📝 Bảng Điểm Chi Tiết (Tỷ lệ: 40% QT - 60% CK)</span>
+            <button type="submit" class="btn btn-warning btn-sm fw-bold">💾 Lưu Toàn Bộ Bảng Điểm</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover text-center align-middle mb-0">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th style="width: 60px;">STT</th>
+                            <th style="width: 140px;">MSSV</th>
+                            <th class="text-start">Họ và Tên</th>
+                            <th style="width: 150px;">Điểm Quá Trình (40%)</th>
+                            <th style="width: 150px;">Điểm Cuối Kỳ (60%)</th>
+                            <th style="width: 120px;">Tổng Kết</th>
+                            <th style="width: 130px;">Xếp Loại</th>
+                            <th style="width: 100px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sv in students %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><strong>{{ sv['mssv'] }}</strong></td>
+                            <td class="text-start">{{ sv['ho_ten'] }}</td>
+                            
+                            <!-- Ô nhập điểm trực tiếp cho giáo viên -->
+                            <td>
+                                <input type="number" step="0.1" min="0" max="10" 
+                                       name="diem_qt_{{ sv['id'] }}" 
+                                       class="form-control form-control-sm text-center fw-bold" 
+                                       value="{{ sv['diem_qt'] }}">
+                            </td>
+                            <td>
+                                <input type="number" step="0.1" min="0" max="10" 
+                                       name="diem_ck_{{ sv['id'] }}" 
+                                       class="form-control form-control-sm text-center fw-bold" 
+                                       value="{{ sv['diem_ck'] }}">
+                            </td>
+
+                            <td><strong class="text-primary fs-6">{{ sv['diem_tk'] }}</strong></td>
+                            <td>
+                                {% if sv['diem_tk'] >= 8.5 %}<span class="badge bg-success">Giỏi (A)</span>
+                                {% elif sv['diem_tk'] >= 7.0 %}<span class="badge bg-info text-dark">Khá (B)</span>
+                                {% elif sv['diem_tk'] >= 5.5 %}<span class="badge bg-warning text-dark">TB (C)</span>
+                                {% elif sv['diem_tk'] >= 4.0 %}<span class="badge bg-secondary">Yếu (D)</span>
+                                {% else %}<span class="badge bg-danger">Học Lại (F)</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/class/{{ current_class['id'] }}/delete-student/{{ sv['id'] }}" 
+                                   class="btn btn-outline-danger btn-sm" 
+                                   onclick="return confirm('Bạn có chắc muốn xóa sinh viên này?')">Xóa</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8" class="py-4 text-muted">Không tìm thấy sinh viên nào.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-light text-end">
+            <button type="submit" class="btn btn-warning fw-bold">💾 Lưu Toàn Bộ Bảng Điểm</button>
+        </div>
+    </div>
+</form>
+
+<!-- Modal Popup Form Thêm Sinh Viên -->
+<div class="modal fade" id="addStudentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/class/{{ current_class['id'] }}/add-student" method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Thêm Sinh Viên Mới Vào Lớp {{ current_class['ma_lop'] }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Mã Số Sinh Viên (MSSV):</label>
+                        <input type="text" name="mssv" class="form-control" placeholder="VD: N24DCCN099" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Họ và Tên:</label>
+                        <input type="text" name="ho_ten" class="form-control" placeholder="VD: Lê Thị Mỹ Linh" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Điểm Quá Trình (40%):</label>
+                            <input type="number" step="0.1" min="0" max="10" name="diem_qt" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Điểm Cuối Kỳ (60%):</label>
+                            <input type="number" step="0.1" min="0" max="10" name="diem_ck" class="form-control" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-success">Thêm Sinh Viên</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

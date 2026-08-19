@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row mb-4">
+    <!-- Cột danh sách lớp -->
+    <div class="col-md-8">
+        <h4 class="fw-bold mb-3">Danh Sách Lớp Quản Lý</h4>
+        <div class="row g-3">
+            {% for c in classes %}
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100 border-primary">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary fw-bold">{{ c['ma_lop'] }}</h5>
+                        <p class="card-text text-muted mb-2">{{ c['ten_lop'] }}</p>
+                        <span class="badge bg-secondary mb-3">Sĩ số: {{ c['so_luong_sv'] }} SV</span>
+                        <div>
+                            <a href="/class/{{ c['id'] }}" class="btn btn-primary btn-sm w-100">👉 Nhấn Vào Lớp</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12"><div class="alert alert-info">Chưa có lớp học nào. Hãy tạo lớp mới ở cột bên phải.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Cột tạo lớp mới -->
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white fw-bold">+ Mở Lớp Học Mới</div>
+            <div class="card-body">
+                <form action="/add-class" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Mã Lớp:</label>
+                        <input type="text" name="ma_lop" class="form-control" placeholder="VD: D22CQCN01-N" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tên Ngành / Mô tả:</label>
+                        <input type="text" name="ten_lop" class="form-control" placeholder="VD: CNTT Khóa 2022" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Tạo Lớp</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
