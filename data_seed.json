@@ -3,7 +3,7 @@
     { "ma_mon": "INT1306", "ten_mon": "Cấu trúc dữ liệu & Giải thuật", "so_tin_chi": 3 },
     { "ma_mon": "INT1314", "ten_mon": "Lập trình Python", "so_tin_chi": 3 },
     { "ma_mon": "INT1154", "ten_mon": "Tin học cơ sở 2 (C++)", "so_tin_chi": 3 },
-    { "ma_mon": "BAS1201", "ten_mon": "Đại số tuyến tính", "so_tin_chi": 3 }
+    { "ma_mon": "BAS1201", "ten_mon": "Đại số tuyến tính", "so_tin_chi": 4 }
   ],
   "sinh_vien": [
     { "mssv": "N24DCCN001", "ho_ten": "Nguyễn Văn An", "ma_lop": "D24CQCN01-N" },
