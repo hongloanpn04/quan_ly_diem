@@ -1,8 +1,8 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for
 import sqlite3
 import json
 import os
-
 app = Flask(__name__)
 DB_NAME = 'quanly_thucte.db'
 
@@ -188,4 +188,5 @@ def delete_student(ma_lop, student_id):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
