@@ -1,0 +1,61 @@
+body {
+    background-color: #f8f9fa;
+    font-family: Arial, sans-serif;
+}
+
+a.navbar-brand {
+    color: #ffffff;                 /* trắng khi bình thường */
+    transition: color 2s ease;
+}
+
+a.navbar-brand:hover,
+a.navbar-brand:focus {
+    color: #6c757d !important;      /* xám đậm hơn */
+}
+
+.navbar-brand-static {
+    cursor: default;
+}
+
+.class-card {
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.class-card:hover {
+    transform: translateY(-3px);
+
+    box-shadow:
+        0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.page-title {
+    font-weight: bold;
+}
+
+.grade-table th {
+    vertical-align: middle;
+}
+
+.grade-table td {
+    vertical-align: middle;
+}
+
+.grade-input {
+    text-align: center;
+    font-weight: bold;
+}
+
+.btn {
+    transition: 0.2s ease;
+}
+
+@media (max-width: 768px) {
+    .page-title {
+        font-size: 22px;
+    }
+    .navbar-brand {
+        font-size: 16px;
+    }
+}

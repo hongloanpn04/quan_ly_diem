@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/Logo_PTIT_University.png?v=1">
+    <title>Cổng Quản Lý Điểm Sinh Viên</title>
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    >
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="bg-light">
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+
+        <div class="container">
+
+            <span class="navbar-brand fw-bold navbar-brand-static">
+                🏫 Cổng Giảng Viên: Quản Lý Điểm
+            </span>
+
+        </div>
+
+    </nav>
+
+
+    <!-- NỘI DUNG -->
+    <main class="container">
+
+        <div class="mb-4 text-center">
+
+            <h2 class="fw-bold text-primary">
+                🏫 CỔNG QUẢN LÝ ĐIỂM SINH VIÊN
+            </h2>
+
+            <p class="text-muted">
+                Chọn lớp học bên dưới để mở sổ điểm
+                và nhập điểm theo từng môn học.
+            </p>
+
+        </div>
+
+
+        <!-- DANH SÁCH LỚP -->
+
+        <div
+            id="classList"
+            class="row g-4"
+        >
+
+            <!-- JavaScript sẽ tạo danh sách lớp ở đây -->
+
+        </div>
+
+
+        <!-- THÔNG BÁO -->
+
+        <div
+            id="loading"
+            class="text-center text-muted"
+        >
+            Đang tải danh sách lớp...
+        </div>
+
+    </main>
+
+
+    <script src="js/index.js"></script>
+
+</body>
+
+</html>
