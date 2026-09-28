@@ -283,10 +283,10 @@
                 </div>
                 <div class="card-body">
                     <div style="background-color: #cff4fc; color: #055160; padding: 10px; border-radius: 4px; font-size: 0.85rem; margin-bottom: 16px;">
-                        <b>Tài khoản thử nghiệm (Mật khẩu: 123456)[cite: 7]:</b><br>
-                        - Giảng viên Quản trị: <b>GV001</b> (dạy 2 lớp)[cite: 7, 10]<br>
-                        - Giảng viên thường: <b>GV006</b>[cite: 7]<br>
-                        - Sinh viên: <b>N24DCCN001</b>[cite: 7]
+                        <b>Tài khoản thử nghiệm (Mật khẩu: 123456):</b><br>
+                        - Giảng viên Quản trị: <b>GV001</b> (dạy 2 lớp, chỉ thấy lớp của mình)<br>
+                        - Giảng viên thường: <b>GV006</b><br>
+                        - Sinh viên: <b>N24DCCN001</b>
                     </div>
                     <form id="formDangNhap">
                         <div class="form-group">
@@ -340,6 +340,7 @@
             <div style="text-align: center; margin-bottom: 24px;">
                 <h2 style="color: #0d6efd; margin-bottom: 6px;">DANH SÁCH LỚP HỌC PHẦN PHỤ TRÁCH</h2>
                 <p style="color: #6c757d; font-size: 0.9rem;">Các lớp học phần bạn trực tiếp được phân công giảng dạy.</p>
+                <p style="margin-top: 6px;"><span class="badge badge-active">Học kỳ hiện tại: <b id="hocKyHienTai">...</b></span></p>
             </div>
             <div id="classList" class="class-grid"></div>
         </section>
@@ -393,8 +394,8 @@
                                 <th style="width: 50px;">STT</th>
                                 <th style="width: 140px;">MSSV</th>
                                 <th style="text-align: left;">Họ và Tên</th>
-                                <th style="width: 130px;">Quá Trình (40%)</th>
-                                <th style="width: 130px;">Cuối Kỳ (60%)</th>
+                                <th id="thQuaTrinh" style="width: 130px;">Quá Trình (40%)</th>
+                                <th id="thCuoiKy" style="width: 130px;">Cuối Kỳ (60%)</th>
                                 <th style="width: 100px;">Tổng Kết</th>
                                 <th style="width: 110px;">Xếp Loại</th>
                             </tr>
@@ -539,6 +540,10 @@
         let studentsList = [];
         let subjectsList = [];
         let coQuyenSua = false;
+        function tyLeMonHienTai() {
+            const m = subjectsList.find(x => String(x.id) === String(currentMonId));
+            return { qt: m ? m.ty_le_qt : 0.4, ck: m ? m.ty_le_ck : 0.6 };
+        }
 
         function esc(s) {
             return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -552,6 +557,7 @@
                 .then(data => {
                     if (data.authenticated) {
                         currentUser = data.user;
+                        hienThiHocKy(data.hoc_ky);
                         hienThiGiaoDienNguoiDung();
                     } else {
                         chuyenManHinh("viewLogin");
@@ -564,6 +570,16 @@
                 document.getElementById(id).classList.add("d-none");
             });
             document.getElementById(viewId).classList.remove("d-none");
+        }
+
+        function hienThiHocKy(hk) {
+            if (hk) document.getElementById("hocKyHienTai").textContent = hk.nhan;
+        }
+
+        function badgeTrangThai(tt, extra = "") {
+            if (tt === "HOAN_THANH") return `<span class="badge badge-done" ${extra}>Đã hoàn thành (Chỉ xem)</span>`;
+            if (tt === "CHUA_BAT_DAU") return `<span class="badge badge-done" ${extra}>Chưa bắt đầu (Chỉ xem)</span>`;
+            return `<span class="badge badge-active" ${extra}>Đang giảng dạy</span>`;
         }
 
         function dongModal(modalId) {
@@ -633,6 +649,7 @@
                     alert(resObj.data.message || "Tài khoản hoặc mật khẩu không chính xác.");
                 } else {
                     currentUser = resObj.data.user;
+                    hienThiHocKy(resObj.data.hoc_ky);
                     alert(resObj.data.message || "Đăng nhập thành công!");
                     hienThiGiaoDienNguoiDung();
                 }
@@ -686,10 +703,8 @@
                         return;
                     }
                     classes.forEach(c => {
-                        const isDone = (c.trang_thai === 'HOAN_THANH');
-                        const statusBadge = isDone 
-                            ? `<span class="badge badge-done" style="margin-bottom: 8px;">Đã hoàn thành (Chỉ xem)</span>` 
-                            : `<span class="badge badge-active" style="margin-bottom: 8px;">Đang giảng dạy</span>`;
+                        const isDone = (c.trang_thai !== 'DANG_DAY');
+                        const statusBadge = badgeTrangThai(c.trang_thai, 'style="margin-bottom: 8px;"');
                         
                         const card = document.createElement("div");
                         card.className = "class-card";
@@ -698,6 +713,8 @@
                             ${statusBadge}
                             <h3 style="color: #0d6efd; margin-bottom: 6px;">${esc(c.ma_lop)}</h3>
                             <div style="font-weight: 700; margin-bottom: 6px;">${esc(c.ten_mon)} (${esc(c.ma_mon)})</div>
+                            <div style="color: #6c757d; font-size: 0.85rem; margin-bottom: 4px;">HK${c.hoc_ky} • ${esc(c.nam_hoc)}</div>
+                            ${currentUser.is_admin ? `<div style="color: #6c757d; font-size: 0.85rem; margin-bottom: 4px;">GV: ${esc(c.gv_phu_trach)}</div>` : ""}
                             <div style="color: #6c757d; font-size: 0.85rem; margin-bottom: 14px;">Sĩ số: <strong>${c.so_luong_sv}</strong> sinh viên</div>
                             <button class="btn ${isDone ? 'btn-outline-secondary' : 'btn-primary'}" style="width: 100%;">
                                 ${isDone ? '👁️ Xem Lại Điểm' : '👉 Vào Sổ Điểm'}
@@ -731,12 +748,12 @@
                     coQuyenSua = data.co_quyen_sua_diem;
 
                     const statusBadge = document.getElementById("badgeTrangThaiLop");
-                    if (data.trang_thai_lop === "HOAN_THANH") {
-                        statusBadge.className = "badge badge-done";
-                        statusBadge.textContent = "Lớp đã hoàn thành (Chỉ xem)";
-                    } else {
+                    if (data.trang_thai_lop === "DANG_DAY") {
                         statusBadge.className = "badge badge-active";
-                        statusBadge.textContent = "Đang giảng dạy (Được nhập điểm)";
+                        statusBadge.textContent = `Đang giảng dạy (Được nhập điểm) • ${data.hoc_ky_lop}`;
+                    } else {
+                        statusBadge.className = "badge badge-done";
+                        statusBadge.textContent = `${data.trang_thai_lop === "HOAN_THANH" ? "Đã hoàn thành" : "Chưa bắt đầu"} (Chỉ xem) • ${data.hoc_ky_lop}`;
                     }
 
                     const nutTop = document.getElementById("btnLuuDiemTop");
@@ -765,7 +782,11 @@
                 select.appendChild(opt);
             });
             const monHienTai = subjectsList.find(m => String(m.id) === String(currentMonId));
-            if (monHienTai) document.getElementById("labelTenMon").textContent = `${monHienTai.ten_mon} (${monHienTai.ma_mon})`;
+            if (monHienTai) {
+                document.getElementById("labelTenMon").textContent = `${monHienTai.ten_mon} (${monHienTai.ma_mon})`;
+                document.getElementById("thQuaTrinh").textContent = `Quá Trình (${Math.round(monHienTai.ty_le_qt * 100)}%)`;
+                document.getElementById("thCuoiKy").textContent = `Cuối Kỳ (${Math.round(monHienTai.ty_le_ck * 100)}%)`;
+            }
         }
 
         function doiMonHoc() {
@@ -834,7 +855,8 @@
             const svId = id.slice(3);
             const qt = document.getElementById(`qt_${svId}`).value;
             const ck = document.getElementById(`ck_${svId}`).value;
-            let tk = (qt !== "" && ck !== "") ? (Number(qt) * 0.4 + Number(ck) * 0.6).toFixed(1) : null;
+            const tl = tyLeMonHienTai();
+            let tk = (qt !== "" && ck !== "") ? (Number(qt) * tl.qt + Number(ck) * tl.ck).toFixed(1) : null;
             document.getElementById(`tk_${svId}`).innerHTML = hienThiTongKet(tk);
             document.getElementById(`loai_${svId}`).innerHTML = tinhXepLoai(tk);
         });

@@ -1,7 +1,9 @@
 import json
 import math
 import os
+import shutil
 import sqlite3
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from flask import Flask, jsonify, render_template, request, session
@@ -13,6 +15,13 @@ SEED_FILE = os.path.join(BASE_DIR, "data_seed.json")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates", "html")
 
+# Tăng số này mỗi khi đổi cấu trúc bảng: DB cũ sẽ được sao lưu (.bak) và nạp lại từ seed.
+SCHEMA_VERSION = 2
+
+# False -> Admin/Giáo vụ (GV001-GV005) cũng chỉ thấy lớp mình được phân công; việc quản lý nằm ở menu QL Môn/QL Lớp.
+# True  -> Admin xem và sửa điểm được lớp của mọi giảng viên.
+ADMIN_XEM_TAT_CA = False
+
 app = Flask(
     __name__,
     static_folder=STATIC_DIR,
@@ -23,6 +32,46 @@ app.secret_key = "ptit_secret_key_no_hash"
 app.json.ensure_ascii = False
 
 
+# ===============================
+# HỌC KỲ THEO THỜI GIAN THỰC
+# Tháng 8 -> 1 : học kỳ 1 | Tháng 2 -> 7 : học kỳ 2
+# ===============================
+def hoc_ky_hien_tai(today=None):
+    today = today or date.today()
+    m, y = today.month, today.year
+    if m >= 8:
+        return 1, f"{y}-{y + 1}"
+    if m == 1:
+        return 1, f"{y - 1}-{y}"
+    return 2, f"{y - 1}-{y}"
+
+
+def khoa_hoc_ky(hoc_ky, nam_hoc):
+    """Khóa so sánh thứ tự thời gian: (năm bắt đầu, học kỳ)."""
+    try:
+        return int(str(nam_hoc)[:4]), int(hoc_ky)
+    except (TypeError, ValueError):
+        return 0, 0
+
+
+def trang_thai_theo_thoi_gian(hoc_ky, nam_hoc):
+    """DANG_DAY: đúng học kỳ hiện tại | HOAN_THANH: đã qua | CHUA_BAT_DAU: chưa tới."""
+    hien_tai = khoa_hoc_ky(*hoc_ky_hien_tai())
+    khoa = khoa_hoc_ky(hoc_ky, nam_hoc)
+    if khoa == hien_tai:
+        return "DANG_DAY"
+    return "HOAN_THANH" if khoa < hien_tai else "CHUA_BAT_DAU"
+
+
+def thu_tu_hien_thi(pc):
+    rank = {"DANG_DAY": 0, "CHUA_BAT_DAU": 1, "HOAN_THANH": 2}[pc["trang_thai"]]
+    nam, hk = khoa_hoc_ky(pc["hoc_ky"], pc["nam_hoc"])
+    return rank, -nam, -hk, pc["ma_lop"], pc["ma_mon"]
+
+
+# ===============================
+# DATABASE
+# ===============================
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
@@ -30,98 +79,68 @@ def get_db_connection():
     return conn
 
 
-def init_db():
-    conn = get_db_connection()
-
-    # 1. Bảng vai trò
-    conn.execute("""
+def tao_bang(conn):
+    conn.executescript("""
         CREATE TABLE IF NOT EXISTS vai_tro (
             id INTEGER PRIMARY KEY,
-            ten_vai_tro TEXT NOT NULL UNIQUE
-        )
-    """)
-
-    # 2. Bảng người dùng (Lưu mật khẩu dạng text thuần)
-    conn.execute("""
+            ma_vai_tro TEXT NOT NULL UNIQUE,
+            ten_vai_tro TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS nguoi_dung (
             id INTEGER PRIMARY KEY,
             ten_dang_nhap TEXT NOT NULL UNIQUE,
             mat_khau TEXT NOT NULL,
             vai_tro_id INTEGER NOT NULL,
+            trang_thai INTEGER NOT NULL DEFAULT 1,
             FOREIGN KEY (vai_tro_id) REFERENCES vai_tro (id)
-        )
-    """)
-
-    # 3. Bảng lớp học
-    conn.execute("""
+        );
         CREATE TABLE IF NOT EXISTS lop_hoc (
             id INTEGER PRIMARY KEY,
             ma_lop TEXT NOT NULL UNIQUE,
             ten_lop TEXT NOT NULL,
-            khoa TEXT
-        )
-    """)
-
-    # 4. Bảng giảng viên
-    conn.execute("""
+            nam_hoc TEXT,
+            hoc_ky INTEGER
+        );
         CREATE TABLE IF NOT EXISTS giang_vien (
             id INTEGER PRIMARY KEY,
             ma_giang_vien TEXT NOT NULL UNIQUE,
             ho_ten TEXT NOT NULL,
             email TEXT,
-            so_dien_thoai TEXT,
+            quyen_quan_ly_sv INTEGER DEFAULT 0,
+            ghi_chu TEXT,
             nguoi_dung_id INTEGER UNIQUE,
             FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung (id) ON DELETE CASCADE
-        )
-    """)
-
-    # 5. Bảng sinh viên
-    conn.execute("""
+        );
         CREATE TABLE IF NOT EXISTS sinh_vien (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             ma_sinh_vien TEXT NOT NULL UNIQUE,
             ho_ten TEXT NOT NULL,
-            ngay_sinh TEXT,
-            gioi_tinh TEXT,
-            email TEXT,
-            so_dien_thoai TEXT,
-            dia_chi TEXT,
             lop_hoc_id INTEGER NOT NULL,
             nguoi_dung_id INTEGER UNIQUE,
             FOREIGN KEY (lop_hoc_id) REFERENCES lop_hoc (id) ON DELETE CASCADE,
             FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung (id) ON DELETE SET NULL
-        )
-    """)
-
-    # 6. Bảng môn học
-    conn.execute("""
+        );
         CREATE TABLE IF NOT EXISTS mon_hoc (
             id INTEGER PRIMARY KEY,
             ma_mon TEXT NOT NULL UNIQUE,
             ten_mon TEXT NOT NULL,
-            so_tin_chi INTEGER DEFAULT 3
-        )
-    """)
-
-    # 7. Bảng phân công giảng dạy
-    conn.execute("""
+            so_tin_chi INTEGER DEFAULT 3,
+            ty_le_qt REAL NOT NULL DEFAULT 0.4,
+            ty_le_ck REAL NOT NULL DEFAULT 0.6
+        );
+        -- Học kỳ/năm học nằm ở phân công; trạng thái (đang dạy/hoàn thành) tính theo ngày hiện tại.
         CREATE TABLE IF NOT EXISTS phan_cong_giang_day (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             giang_vien_id INTEGER NOT NULL,
             mon_hoc_id INTEGER NOT NULL,
             lop_hoc_id INTEGER NOT NULL,
-            hoc_ky INTEGER DEFAULT 1,
-            nam_hoc TEXT DEFAULT '2024-2025',
-            trang_thai TEXT DEFAULT 'DANG_DAY' CHECK(trang_thai IN ('DANG_DAY', 'HOAN_THANH')),
+            hoc_ky INTEGER NOT NULL,
+            nam_hoc TEXT NOT NULL,
             FOREIGN KEY (giang_vien_id) REFERENCES giang_vien (id) ON DELETE CASCADE,
             FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id) ON DELETE CASCADE,
             FOREIGN KEY (lop_hoc_id) REFERENCES lop_hoc (id) ON DELETE CASCADE,
-            UNIQUE(giang_vien_id, mon_hoc_id, lop_hoc_id, hoc_ky, nam_hoc)
-        )
-    """)
-
-    # 8. Bảng điểm
-    conn.execute("""
+            UNIQUE (giang_vien_id, mon_hoc_id, lop_hoc_id, hoc_ky, nam_hoc)
+        );
         CREATE TABLE IF NOT EXISTS bang_diem (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sinh_vien_id INTEGER NOT NULL,
@@ -132,69 +151,86 @@ def init_db():
             FOREIGN KEY (sinh_vien_id) REFERENCES sinh_vien (id) ON DELETE CASCADE,
             FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id) ON DELETE CASCADE,
             UNIQUE (sinh_vien_id, mon_hoc_id)
-        )
+        );
     """)
 
-    # Nạp dữ liệu từ data_seed.json nếu DB rỗng
+
+def nap_seed(conn):
+    with open(SEED_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    hk_now, nam_now = hoc_ky_hien_tai()
+
+    for vt in data.get("vai_tro", []):
+        conn.execute("INSERT OR IGNORE INTO vai_tro (id, ma_vai_tro, ten_vai_tro) VALUES (?, ?, ?)",
+                     (vt["id"], vt["ma_vai_tro"], vt["ten_vai_tro"]))
+
+    for nd in data.get("nguoi_dung", []):
+        conn.execute(
+            "INSERT OR IGNORE INTO nguoi_dung (id, ten_dang_nhap, mat_khau, vai_tro_id, trang_thai) VALUES (?, ?, ?, ?, ?)",
+            (nd["id"], nd["ten_dang_nhap"].strip().upper(), str(nd["mat_khau"]).strip(),
+             nd["vai_tro_id"], 1 if nd.get("trang_thai", True) else 0))
+
+    for lh in data.get("lop_hoc", []):
+        conn.execute("INSERT OR IGNORE INTO lop_hoc (id, ma_lop, ten_lop, nam_hoc, hoc_ky) VALUES (?, ?, ?, ?, ?)",
+                     (lh["id"], lh["ma_lop"].strip(), lh["ten_lop"].strip(), lh.get("nam_hoc"), lh.get("hoc_ky")))
+
+    for gv in data.get("giang_vien", []):
+        conn.execute(
+            """INSERT OR IGNORE INTO giang_vien
+               (id, ma_giang_vien, ho_ten, email, quyen_quan_ly_sv, ghi_chu, nguoi_dung_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (gv["id"], (gv.get("mgv") or gv.get("ma_giang_vien")).strip().upper(), gv["ho_ten"].strip(),
+             gv.get("email"), 1 if gv.get("quyen_quan_ly_sv") else 0, gv.get("ghi_chu"), gv.get("nguoi_dung_id")))
+
+    for mh in data.get("mon_hoc", []):
+        conn.execute(
+            "INSERT OR IGNORE INTO mon_hoc (id, ma_mon, ten_mon, so_tin_chi, ty_le_qt, ty_le_ck) VALUES (?, ?, ?, ?, ?, ?)",
+            (mh["id"], mh["ma_mon"].strip().upper(), mh["ten_mon"].strip(), mh.get("so_tin_chi", 3),
+             mh.get("ty_le_qt", 0.4), mh.get("ty_le_ck", 0.6)))
+
+    for sv in data.get("sinh_vien", []):  # id tự tăng theo đúng thứ tự trong file
+        conn.execute(
+            "INSERT OR IGNORE INTO sinh_vien (ma_sinh_vien, ho_ten, lop_hoc_id, nguoi_dung_id) VALUES (?, ?, ?, ?)",
+            ((sv.get("mssv") or sv.get("ma_sinh_vien")).strip().upper(), sv["ho_ten"].strip(),
+             sv["lop_hoc_id"], sv.get("nguoi_dung_id")))
+
+    for pc in data.get("phan_cong_giang_day", []):
+        # Seed không ghi học kỳ -> coi là phân công của học kỳ hiện tại (theo ngày thực).
+        conn.execute(
+            """INSERT OR IGNORE INTO phan_cong_giang_day (id, giang_vien_id, mon_hoc_id, lop_hoc_id, hoc_ky, nam_hoc)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (pc["id"], pc["giang_vien_id"], pc["mon_hoc_id"], pc["lop_hoc_id"],
+             pc.get("hoc_ky", hk_now), pc.get("nam_hoc", nam_now)))
+
+    for bd in data.get("bang_diem", []):
+        conn.execute(
+            """INSERT OR IGNORE INTO bang_diem (id, sinh_vien_id, mon_hoc_id, diem_qua_trinh, diem_thi, diem_tong_ket)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (bd["id"], bd["sinh_vien_id"], bd["mon_hoc_id"],
+             bd.get("diem_qt"), bd.get("diem_ck"), bd.get("diem_tk")))
+
+
+def init_db():
+    if os.path.exists(DB_NAME):
+        c = sqlite3.connect(DB_NAME)
+        ver = c.execute("PRAGMA user_version").fetchone()[0]
+        c.close()
+        if ver != SCHEMA_VERSION:  # DB cũ khác cấu trúc -> sao lưu rồi tạo lại
+            shutil.move(DB_NAME, DB_NAME + f".v{ver}.bak")
+
+    conn = get_db_connection()
+    tao_bang(conn)
     if os.path.exists(SEED_FILE) and conn.execute("SELECT COUNT(*) FROM vai_tro").fetchone()[0] == 0:
-        with open(SEED_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        for vt in data.get("vai_tro", []):
-            conn.execute("INSERT OR IGNORE INTO vai_tro (id, ten_vai_tro) VALUES (?, ?)", (vt["id"], vt["ten_vai_tro"]))
-
-        for nd in data.get("nguoi_dung", []):
-            conn.execute(
-                "INSERT OR IGNORE INTO nguoi_dung (id, ten_dang_nhap, mat_khau, vai_tro_id) VALUES (?, ?, ?, ?)",
-                (nd["id"], nd["ten_dang_nhap"].strip().upper(), str(nd["mat_khau"]).strip(), nd["vai_tro_id"])
-            )
-
-        for lh in data.get("lop_hoc", []):
-            conn.execute(
-                "INSERT OR IGNORE INTO lop_hoc (id, ma_lop, ten_lop, khoa) VALUES (?, ?, ?, ?)",
-                (lh["id"], lh["ma_lop"].strip(), lh["ten_lop"].strip(), lh.get("khoa"))
-            )
-
-        for gv in data.get("giang_vien", []):
-            conn.execute(
-                """INSERT OR IGNORE INTO giang_vien (id, ma_giang_vien, ho_ten, email, so_dien_thoai, nguoi_dung_id)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (gv["id"], gv["ma_giang_vien"].strip().upper(), gv["ho_ten"].strip(), gv.get("email"), gv.get("so_dien_thoai"), gv.get("nguoi_dung_id"))
-            )
-
-        for mh in data.get("mon_hoc", []):
-            conn.execute(
-                "INSERT OR IGNORE INTO mon_hoc (id, ma_mon, ten_mon, so_tin_chi) VALUES (?, ?, ?, ?)",
-                (mh["id"], mh["ma_mon"].strip().upper(), mh["ten_mon"].strip(), mh.get("so_tin_chi", 3))
-            )
-
-        for sv in data.get("sinh_vien", []):
-            conn.execute(
-                """INSERT OR IGNORE INTO sinh_vien (id, ma_sinh_vien, ho_ten, ngay_sinh, gioi_tinh, email, so_dien_thoai, dia_chi, lop_hoc_id, nguoi_dung_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (sv["id"], sv["ma_sinh_vien"].strip().upper(), sv["ho_ten"].strip(), sv.get("ngay_sinh"), sv.get("gioi_tinh"), sv.get("email"), sv.get("so_dien_thoai"), sv.get("dia_chi"), sv["lop_hoc_id"], sv.get("nguoi_dung_id"))
-            )
-
-        for pc in data.get("phan_cong_giang_day", []):
-            # Quy ước: Các phân công học kỳ 1 năm 2024-2025 là HOAN_THANH (lớp cũ chỉ xem), học kỳ 2 là DANG_DAY (được nhập điểm)
-            trang_thai = "HOAN_THANH" if pc.get("hoc_ky") == 1 else "DANG_DAY"
-            conn.execute(
-                """INSERT OR IGNORE INTO phan_cong_giang_day (id, giang_vien_id, mon_hoc_id, lop_hoc_id, hoc_ky, nam_hoc, trang_thai)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (pc["id"], pc["giang_vien_id"], pc["mon_hoc_id"], pc["lop_hoc_id"], pc.get("hoc_ky", 1), pc.get("nam_hoc", "2024-2025"), trang_thai)
-            )
-
-        for bd in data.get("bang_diem", []):
-            conn.execute(
-                """INSERT OR IGNORE INTO bang_diem (id, sinh_vien_id, mon_hoc_id, diem_qua_trinh, diem_thi, diem_tong_ket)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (bd["id"], bd["sinh_vien_id"], bd["mon_hoc_id"], bd.get("diem_qua_trinh"), bd.get("diem_thi"), bd.get("diem_tong_ket"))
-            )
-
+        nap_seed(conn)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     conn.commit()
     conn.close()
 
 
+# ===============================
+# TIỆN ÍCH
+# ===============================
 def parse_diem(value):
     if value is None or value == "":
         return None
@@ -204,13 +240,48 @@ def parse_diem(value):
     return d
 
 
-def tinh_tong_ket(diem_qt, diem_ck):
-    tk = Decimal(str(diem_qt)) * Decimal("0.4") + Decimal(str(diem_ck)) * Decimal("0.6")
+def tinh_tong_ket(diem_qt, diem_ck, ty_le_qt=0.4, ty_le_ck=0.6):
+    tk = Decimal(str(diem_qt)) * Decimal(str(ty_le_qt)) + Decimal(str(diem_ck)) * Decimal(str(ty_le_ck))
     return float(tk.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
 def loi(message, status=400):
     return jsonify({"message": message}), status
+
+
+def nhan_hoc_ky():
+    hk, nam = hoc_ky_hien_tai()
+    return {"hoc_ky": hk, "nam_hoc": nam, "nhan": f"HK{hk} • {nam}"}
+
+
+def xem_tat_ca():
+    return bool(session.get("is_admin")) and ADMIN_XEM_TAT_CA
+
+
+def lay_phan_cong(conn, lop_id, mon_id=None):
+    """Các phân công của giảng viên đang đăng nhập (hoặc của mọi GV nếu là Admin xem tất cả) trong 1 lớp."""
+    sql = """
+        SELECT pc.*, mh.ma_mon, mh.ten_mon, lh.ma_lop, gv.ho_ten AS gv_phu_trach
+        FROM phan_cong_giang_day pc
+        JOIN mon_hoc mh ON pc.mon_hoc_id = mh.id
+        JOIN lop_hoc lh ON pc.lop_hoc_id = lh.id
+        JOIN giang_vien gv ON pc.giang_vien_id = gv.id
+        WHERE pc.lop_hoc_id = ?
+    """
+    params = [lop_id]
+    if not xem_tat_ca():
+        sql += " AND pc.giang_vien_id = ?"
+        params.append(session.get("giang_vien_id"))
+    if mon_id is not None:
+        sql += " AND pc.mon_hoc_id = ?"
+        params.append(mon_id)
+    rows = []
+    for r in conn.execute(sql, params).fetchall():
+        d = dict(r)
+        d["trang_thai"] = trang_thai_theo_thoi_gian(d["hoc_ky"], d["nam_hoc"])
+        rows.append(d)
+    rows.sort(key=thu_tu_hien_thi)
+    return rows
 
 
 @app.route("/")
@@ -223,61 +294,50 @@ def trang_chu():
 
 
 # ===============================
-# AUTHENTICATION (TEXT THUẦN)
+# AUTHENTICATION
 # ===============================
 @app.route("/api/dang-nhap", methods=["POST"])
 def api_dang_nhap():
     body = request.get_json(silent=True) or {}
     tk = str(body.get("tai_khoan", "")).strip().upper()
     mk = str(body.get("mat_khau", "")).strip()
-
     if not tk or not mk:
         return loi("Vui lòng nhập tài khoản và mật khẩu.")
 
     conn = get_db_connection()
     user = conn.execute("""
-        SELECT nd.*, vt.ten_vai_tro 
-        FROM nguoi_dung nd 
-        JOIN vai_tro vt ON nd.vai_tro_id = vt.id 
-        WHERE UPPER(nd.ten_dang_nhap) = ? AND nd.mat_khau = ?
+        SELECT nd.*, vt.ma_vai_tro
+        FROM nguoi_dung nd JOIN vai_tro vt ON nd.vai_tro_id = vt.id
+        WHERE UPPER(nd.ten_dang_nhap) = ? AND nd.mat_khau = ? AND nd.trang_thai = 1
     """, (tk, mk)).fetchone()
-
     if not user:
         conn.close()
         return loi("Tài khoản hoặc mật khẩu không đúng.", 401)
 
-    vai_tro = user["ten_vai_tro"]
-    is_admin = (vai_tro == "ADMIN")
-    ho_ten = tk
-    gv_id = None
-
+    vai_tro = user["ma_vai_tro"]
+    ho_ten, gv_id = tk, None
     if vai_tro in ("ADMIN", "GIANG_VIEN"):
         gv = conn.execute("SELECT * FROM giang_vien WHERE nguoi_dung_id = ?", (user["id"],)).fetchone()
         if gv:
-            ho_ten = gv["ho_ten"]
-            gv_id = gv["id"]
+            ho_ten, gv_id = gv["ho_ten"], gv["id"]
     else:
         sv = conn.execute("SELECT * FROM sinh_vien WHERE nguoi_dung_id = ?", (user["id"],)).fetchone()
         if sv:
             ho_ten = sv["ho_ten"]
-
     conn.close()
 
+    session.clear()
     session["user_id"] = user["id"]
     session["ten_dang_nhap"] = tk
     session["vai_tro"] = vai_tro
     session["ho_ten"] = ho_ten
-    session["is_admin"] = is_admin
+    session["is_admin"] = (vai_tro == "ADMIN")
     session["giang_vien_id"] = gv_id
 
     return jsonify({
         "message": "Đăng nhập thành công!",
-        "user": {
-            "ten_dang_nhap": tk,
-            "ho_ten": ho_ten,
-            "vai_tro": vai_tro,
-            "is_admin": is_admin
-        }
+        "user": {"ten_dang_nhap": tk, "ho_ten": ho_ten, "vai_tro": vai_tro, "is_admin": vai_tro == "ADMIN"},
+        "hoc_ky": nhan_hoc_ky(),
     })
 
 
@@ -297,20 +357,24 @@ def api_me():
             "ten_dang_nhap": session.get("ten_dang_nhap"),
             "ho_ten": session.get("ho_ten"),
             "vai_tro": session.get("vai_tro"),
-            "is_admin": session.get("is_admin", False)
-        }
+            "is_admin": session.get("is_admin", False),
+        },
+        "hoc_ky": nhan_hoc_ky(),
     })
+
+
+@app.route("/api/hoc-ky-hien-tai")
+def api_hoc_ky_hien_tai():
+    return jsonify(nhan_hoc_ky())
 
 
 @app.route("/api/doi-mat-khau", methods=["POST"])
 def api_doi_mat_khau():
     if "user_id" not in session:
         return loi("Chưa đăng nhập.", 401)
-
     body = request.get_json(silent=True) or {}
     mk_cu = str(body.get("mk_cu", "")).strip()
     mk_moi = str(body.get("mk_moi", "")).strip()
-
     if len(mk_moi) < 6:
         return loi("Mật khẩu mới phải từ 6 ký tự trở lên.")
 
@@ -319,7 +383,6 @@ def api_doi_mat_khau():
     if not user or user["mat_khau"] != mk_cu:
         conn.close()
         return loi("Mật khẩu cũ không chính xác.")
-
     conn.execute("UPDATE nguoi_dung SET mat_khau = ? WHERE id = ?", (mk_moi, session["user_id"]))
     conn.commit()
     conn.close()
@@ -336,12 +399,10 @@ def api_sv_bang_diem():
 
     conn = get_db_connection()
     sv = conn.execute("""
-        SELECT sv.*, lh.ma_lop, lh.ten_lop 
-        FROM sinh_vien sv 
-        JOIN lop_hoc lh ON sv.lop_hoc_id = lh.id 
+        SELECT sv.id, sv.ma_sinh_vien AS mssv, sv.ho_ten, lh.ma_lop, lh.ten_lop
+        FROM sinh_vien sv JOIN lop_hoc lh ON sv.lop_hoc_id = lh.id
         WHERE sv.nguoi_dung_id = ?
     """, (session["user_id"],)).fetchone()
-
     if not sv:
         conn.close()
         return loi("Không tìm thấy hồ sơ sinh viên.", 404)
@@ -354,54 +415,39 @@ def api_sv_bang_diem():
         ORDER BY mh.ma_mon
     """, (sv["id"],)).fetchall()
     conn.close()
-
-    return jsonify({
-        "sinh_vien": dict(sv),
-        "bang_diem": [dict(r) for r in rows]
-    })
+    return jsonify({"sinh_vien": dict(sv), "bang_diem": [dict(r) for r in rows]})
 
 
 # ===============================
-# GIẢNG VIÊN & ADMIN: QUẢN LÝ LỚP
+# GIẢNG VIÊN & ADMIN: LỚP HỌC PHẦN
 # ===============================
 @app.route("/api/classes")
 def api_classes():
     if session.get("vai_tro") not in ("ADMIN", "GIANG_VIEN"):
         return loi("Không có quyền truy cập.", 403)
 
-    is_admin = session.get("is_admin", False)
-    gv_id = session.get("giang_vien_id")
     conn = get_db_connection()
-
-    if is_admin:
-        # Admin xem được toàn bộ các lớp
-        rows = conn.execute("""
-            SELECT lh.ma_lop, COUNT(DISTINCT sv.id) AS so_luong_sv,
-                   COALESCE(pc.trang_thai, 'DANG_DAY') AS trang_thai,
-                   COALESCE(gv.ho_ten, 'Nhiều GV / Chưa gán') AS gv_phu_trach
-            FROM lop_hoc lh
-            LEFT JOIN sinh_vien sv ON lh.id = sv.lop_hoc_id
-            LEFT JOIN phan_cong_giang_day pc ON lh.id = pc.lop_hoc_id
-            LEFT JOIN giang_vien gv ON pc.giang_vien_id = gv.id
-            GROUP BY lh.ma_lop
-            ORDER BY lh.ma_lop
-        """).fetchall()
-    else:
-        # GV thường: chỉ xem lớp mình đang dạy hoặc lớp cũ đã hoàn thành
-        rows = conn.execute("""
-            SELECT lh.ma_lop, COUNT(DISTINCT sv.id) AS so_luong_sv,
-                   pc.trang_thai, gv.ho_ten AS gv_phu_trach
-            FROM phan_cong_giang_day pc
-            JOIN lop_hoc lh ON pc.lop_hoc_id = lh.id
-            JOIN giang_vien gv ON pc.giang_vien_id = gv.id
-            LEFT JOIN sinh_vien sv ON lh.id = sv.lop_hoc_id
-            WHERE pc.giang_vien_id = ?
-            GROUP BY lh.ma_lop, pc.trang_thai
-            ORDER BY pc.trang_thai DESC, lh.ma_lop
-        """, (gv_id,)).fetchall()
-
+    sql = """
+        SELECT pc.id AS pc_id, lh.id AS lop_id, lh.ma_lop, lh.ten_lop,
+               mh.id AS mon_hoc_id, mh.ma_mon, mh.ten_mon,
+               gv.ho_ten AS gv_phu_trach, pc.hoc_ky, pc.nam_hoc,
+               (SELECT COUNT(*) FROM sinh_vien sv WHERE sv.lop_hoc_id = lh.id) AS so_luong_sv
+        FROM phan_cong_giang_day pc
+        JOIN lop_hoc lh ON pc.lop_hoc_id = lh.id
+        JOIN mon_hoc mh ON pc.mon_hoc_id = mh.id
+        JOIN giang_vien gv ON pc.giang_vien_id = gv.id
+    """
+    params = ()
+    if not xem_tat_ca():
+        sql += " WHERE pc.giang_vien_id = ?"   # CHỈ lớp được phân công cho người đăng nhập
+        params = (session.get("giang_vien_id"),)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
     conn.close()
-    return jsonify([dict(r) for r in rows])
+
+    for r in rows:
+        r["trang_thai"] = trang_thai_theo_thoi_gian(r["hoc_ky"], r["nam_hoc"])
+    rows.sort(key=thu_tu_hien_thi)
+    return jsonify(rows)
 
 
 @app.route("/api/class/<ma_lop>")
@@ -409,37 +455,43 @@ def api_class_detail(ma_lop):
     if session.get("vai_tro") not in ("ADMIN", "GIANG_VIEN"):
         return loi("Không có quyền truy cập.", 403)
 
-    is_admin = session.get("is_admin", False)
-    gv_id = session.get("giang_vien_id")
+    tat_ca = xem_tat_ca()
     conn = get_db_connection()
-
     lop = conn.execute("SELECT * FROM lop_hoc WHERE ma_lop = ?", (ma_lop,)).fetchone()
     if not lop:
         conn.close()
         return loi("Lớp không tồn tại.", 404)
 
-    # Quyền truy cập lớp
-    pc = conn.execute("SELECT * FROM phan_cong_giang_day WHERE lop_hoc_id = ? AND giang_vien_id = ?", (lop["id"], gv_id)).fetchone()
-    if not is_admin and not pc:
+    pcs = lay_phan_cong(conn, lop["id"])
+    if not pcs and not tat_ca:
         conn.close()
         return loi("Bạn không được phân công dạy lớp này.", 403)
 
-    # Chỉ cho sửa điểm nếu là Admin hoặc là GV dạy lớp ở trạng thái DANG_DAY
-    co_quyen_sua_diem = False
-    if is_admin:
-        co_quyen_sua_diem = True
-    elif pc and pc["trang_thai"] == "DANG_DAY":
-        co_quyen_sua_diem = True
+    # Chỉ các môn giảng viên được phân công ở lớp này (Admin xem tất cả: mọi môn có phân công ở lớp)
+    subjects, seen = [], set()
+    for p in pcs:
+        if p["mon_hoc_id"] not in seen:
+            seen.add(p["mon_hoc_id"])
+            subjects.append(p["mon_hoc_id"])
+    if subjects:
+        marks = ",".join("?" * len(subjects))
+        subjects = conn.execute(f"SELECT * FROM mon_hoc WHERE id IN ({marks}) ORDER BY ma_mon", subjects).fetchall()
+    else:  # chỉ xảy ra khi Admin xem tất cả và lớp chưa có phân công nào
+        subjects = conn.execute("SELECT * FROM mon_hoc ORDER BY ma_mon").fetchall()
 
-    subjects = conn.execute("SELECT * FROM mon_hoc ORDER BY id").fetchall()
     mon_id = request.args.get("mon_id", type=int)
-    ids_hop_le = {s["id"] for s in subjects}
-    if mon_id not in ids_hop_le and subjects:
-        mon_id = subjects[0]["id"]
+    if mon_id not in {s["id"] for s in subjects}:
+        mon_id = subjects[0]["id"] if subjects else None
+    if mon_id is None:
+        conn.close()
+        return loi("Lớp này chưa có môn học nào được phân công.", 404)
+
+    pc = next((p for p in pcs if p["mon_hoc_id"] == mon_id), None)   # đã sắp: học kỳ hiện tại lên đầu
+    trang_thai = pc["trang_thai"] if pc else "DANG_DAY"
+    co_quyen_sua_diem = bool(tat_ca or trang_thai == "DANG_DAY")
 
     students = conn.execute("""
         SELECT sv.id AS sv_id, sv.ma_sinh_vien AS mssv, sv.ho_ten,
-               'Cong nghe Thong tin' AS chuyen_nganh,
                bd.diem_qua_trinh AS diem_qt, bd.diem_thi AS diem_ck, bd.diem_tong_ket AS diem_tk
         FROM sinh_vien sv
         LEFT JOIN bang_diem bd ON bd.sinh_vien_id = sv.id AND bd.mon_hoc_id = ?
@@ -454,7 +506,8 @@ def api_class_detail(ma_lop):
         "subjects": [dict(s) for s in subjects],
         "students": [dict(s) for s in students],
         "co_quyen_sua_diem": co_quyen_sua_diem,
-        "trang_thai_lop": pc["trang_thai"] if pc else "DANG_DAY"
+        "trang_thai_lop": trang_thai,
+        "hoc_ky_lop": f"HK{pc['hoc_ky']} • {pc['nam_hoc']}" if pc else nhan_hoc_ky()["nhan"],
     })
 
 
@@ -463,23 +516,11 @@ def api_update_grades(ma_lop):
     if session.get("vai_tro") not in ("ADMIN", "GIANG_VIEN"):
         return loi("Không có quyền cập nhật điểm.", 403)
 
-    is_admin = session.get("is_admin", False)
-    gv_id = session.get("giang_vien_id")
     conn = get_db_connection()
-
     lop = conn.execute("SELECT * FROM lop_hoc WHERE ma_lop = ?", (ma_lop,)).fetchone()
     if not lop:
         conn.close()
         return loi("Lớp không tồn tại.", 404)
-
-    if not is_admin:
-        pc = conn.execute(
-            "SELECT * FROM phan_cong_giang_day WHERE lop_hoc_id = ? AND giang_vien_id = ? AND trang_thai = 'DANG_DAY'",
-            (lop["id"], gv_id)
-        ).fetchone()
-        if not pc:
-            conn.close()
-            return loi("Lớp này đã hoàn thành hoặc bạn không có quyền sửa điểm.", 403)
 
     body = request.get_json(silent=True) or {}
     try:
@@ -488,10 +529,26 @@ def api_update_grades(ma_lop):
         conn.close()
         return loi("Mã môn học không hợp lệ.")
 
-    grades = body.get("grades") or []
+    mon = conn.execute("SELECT * FROM mon_hoc WHERE id = ?", (mon_id,)).fetchone()
+    if not mon:
+        conn.close()
+        return loi("Môn học không tồn tại.", 404)
+
+    if not xem_tat_ca():
+        pcs = lay_phan_cong(conn, lop["id"], mon_id)
+        if not pcs:
+            conn.close()
+            return loi("Bạn không được phân công dạy môn này ở lớp này.", 403)
+        if pcs[0]["trang_thai"] != "DANG_DAY":
+            conn.close()
+            return loi("Môn này không thuộc học kỳ hiện tại nên chỉ được xem, không được sửa điểm.", 403)
+
+    sv_hop_le = {r["id"] for r in conn.execute("SELECT id FROM sinh_vien WHERE lop_hoc_id = ?", (lop["id"],))}
     try:
-        for g in grades:
+        for g in body.get("grades") or []:
             sv_id = int(g.get("sv_id"))
+            if sv_id not in sv_hop_le:
+                raise ValueError("Sinh viên không thuộc lớp này.")
             diem_qt = parse_diem(g.get("diem_qt"))
             diem_ck = parse_diem(g.get("diem_ck"))
 
@@ -499,7 +556,8 @@ def api_update_grades(ma_lop):
                 conn.execute("DELETE FROM bang_diem WHERE sinh_vien_id = ? AND mon_hoc_id = ?", (sv_id, mon_id))
                 continue
 
-            diem_tk = tinh_tong_ket(diem_qt, diem_ck) if (diem_qt is not None and diem_ck is not None) else None
+            diem_tk = (tinh_tong_ket(diem_qt, diem_ck, mon["ty_le_qt"], mon["ty_le_ck"])
+                       if (diem_qt is not None and diem_ck is not None) else None)
             conn.execute("""
                 INSERT INTO bang_diem (sinh_vien_id, mon_hoc_id, diem_qua_trinh, diem_thi, diem_tong_ket)
                 VALUES (?, ?, ?, ?, ?)
@@ -509,10 +567,14 @@ def api_update_grades(ma_lop):
                     diem_tong_ket = excluded.diem_tong_ket
             """, (sv_id, mon_id, diem_qt, diem_ck, diem_tk))
         conn.commit()
+    except ValueError as e:
+        conn.rollback()
+        conn.close()
+        return loi(str(e) or "Điểm không hợp lệ (phải từ 0 đến 10).")
     except Exception as e:
         conn.rollback()
         conn.close()
-        return loi(f"Lỗi khi lưu điểm: {str(e)}", 500)
+        return loi(f"Lỗi khi lưu điểm: {e}", 500)
 
     conn.close()
     return jsonify({"message": "Đã lưu bảng điểm thành công!"})
@@ -521,11 +583,14 @@ def api_update_grades(ma_lop):
 # ===============================
 # ADMIN: QUẢN LÝ MÔN HỌC
 # ===============================
+def can_admin():
+    return None if session.get("is_admin") else loi("Chỉ Quản trị viên mới được thao tác.", 403)
+
+
 @app.route("/api/admin/mon-hoc", methods=["GET", "POST"])
 def api_admin_mon_hoc():
-    if not session.get("is_admin"):
-        return loi("Chỉ Quản trị viên mới được thao tác.", 403)
-
+    if (e := can_admin()):
+        return e
     conn = get_db_connection()
     if request.method == "GET":
         rows = conn.execute("SELECT * FROM mon_hoc ORDER BY ma_mon").fetchall()
@@ -535,32 +600,114 @@ def api_admin_mon_hoc():
     body = request.get_json(silent=True) or {}
     ma_mon = str(body.get("ma_mon", "")).strip().upper()
     ten_mon = str(body.get("ten_mon", "")).strip()
-    so_tc = int(body.get("so_tin_chi", 3))
-
+    try:
+        so_tc = int(body.get("so_tin_chi", 3))
+    except (TypeError, ValueError):
+        conn.close()
+        return loi("Số tín chỉ không hợp lệ.")
     if not ma_mon or not ten_mon:
         conn.close()
         return loi("Mã môn và tên môn không được rỗng.")
-
     try:
         conn.execute("INSERT INTO mon_hoc (ma_mon, ten_mon, so_tin_chi) VALUES (?, ?, ?)", (ma_mon, ten_mon, so_tc))
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
         return loi("Mã môn học này đã tồn tại.", 409)
-
     conn.close()
     return jsonify({"message": "Thêm môn học thành công!"}), 201
 
 
-@app.route("/api/admin/mon-hoc/<int:mon_id>", methods=["DELETE"])
-def api_admin_xoa_mon(mon_id):
-    if not session.get("is_admin"):
-        return loi("Chỉ Quản trị viên mới được thao tác.", 403)
+@app.route("/api/admin/mon-hoc/<int:mon_id>", methods=["PUT", "DELETE"])
+def api_admin_mon_hoc_id(mon_id):
+    if (e := can_admin()):
+        return e
     conn = get_db_connection()
-    conn.execute("DELETE FROM mon_hoc WHERE id = ?", (mon_id,))
+    if request.method == "DELETE":
+        conn.execute("DELETE FROM mon_hoc WHERE id = ?", (mon_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Đã xóa môn học."})
+
+    body = request.get_json(silent=True) or {}
+    ten_mon = str(body.get("ten_mon", "")).strip()
+    try:
+        so_tc = int(body.get("so_tin_chi", 3))
+    except (TypeError, ValueError):
+        conn.close()
+        return loi("Số tín chỉ không hợp lệ.")
+    if not ten_mon:
+        conn.close()
+        return loi("Tên môn không được rỗng.")
+    conn.execute("UPDATE mon_hoc SET ten_mon = ?, so_tin_chi = ? WHERE id = ?", (ten_mon, so_tc, mon_id))
     conn.commit()
     conn.close()
-    return jsonify({"message": "Đã xóa môn học."})
+    return jsonify({"message": "Cập nhật môn học thành công!"})
+
+
+# ===============================
+# ADMIN: QUẢN LÝ LỚP HỌC
+# ===============================
+@app.route("/api/admin/lop-hoc", methods=["GET", "POST"])
+def api_admin_lop_hoc():
+    if (e := can_admin()):
+        return e
+    conn = get_db_connection()
+    if request.method == "GET":
+        rows = conn.execute("""
+            SELECT lh.id, lh.ma_lop, lh.ten_lop, lh.nam_hoc, lh.hoc_ky, COUNT(sv.id) AS so_sv
+            FROM lop_hoc lh LEFT JOIN sinh_vien sv ON sv.lop_hoc_id = lh.id
+            GROUP BY lh.id ORDER BY lh.ma_lop
+        """).fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+
+    body = request.get_json(silent=True) or {}
+    hk_now, nam_now = hoc_ky_hien_tai()
+    ma_lop = str(body.get("ma_lop", "")).strip()
+    ten_lop = str(body.get("ten_lop", "")).strip()
+    nam_hoc = str(body.get("nam_hoc") or nam_now).strip()
+    hoc_ky = body.get("hoc_ky") or hk_now
+    if not ma_lop or not ten_lop:
+        conn.close()
+        return loi("Mã lớp và tên lớp không được rỗng.")
+    if hoc_ky not in (1, 2):
+        conn.close()
+        return loi("Học kỳ chỉ nhận giá trị 1 hoặc 2.")
+    try:
+        conn.execute("INSERT INTO lop_hoc (ma_lop, ten_lop, nam_hoc, hoc_ky) VALUES (?, ?, ?, ?)",
+                     (ma_lop, ten_lop, nam_hoc, hoc_ky))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return loi("Mã lớp này đã tồn tại.", 409)
+    conn.close()
+    return jsonify({"message": "Tạo lớp học thành công!"}), 201
+
+
+@app.route("/api/admin/lop-hoc/<int:lop_id>", methods=["PUT", "DELETE"])
+def api_admin_lop_hoc_id(lop_id):
+    if (e := can_admin()):
+        return e
+    conn = get_db_connection()
+    if request.method == "DELETE":
+        conn.execute("DELETE FROM lop_hoc WHERE id = ?", (lop_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Đã xóa lớp học."})
+
+    body = request.get_json(silent=True) or {}
+    ten_lop = str(body.get("ten_lop", "")).strip()
+    nam_hoc = str(body.get("nam_hoc", "")).strip()
+    hoc_ky = body.get("hoc_ky")
+    if not ten_lop or not nam_hoc or hoc_ky not in (1, 2):
+        conn.close()
+        return loi("Tên lớp, năm học và học kỳ (1 hoặc 2) là bắt buộc.")
+    conn.execute("UPDATE lop_hoc SET ten_lop = ?, nam_hoc = ?, hoc_ky = ? WHERE id = ?",
+                 (ten_lop, nam_hoc, hoc_ky, lop_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Cập nhật lớp học thành công!"})
 
 
 # ===============================
@@ -568,56 +715,55 @@ def api_admin_xoa_mon(mon_id):
 # ===============================
 @app.route("/api/admin/phan-cong", methods=["GET", "POST"])
 def api_admin_phan_cong():
-    if not session.get("is_admin"):
-        return loi("Chỉ Quản trị viên mới được thao tác.", 403)
-
+    if (e := can_admin()):
+        return e
     conn = get_db_connection()
     if request.method == "GET":
-        rows = conn.execute("""
-            SELECT pc.id, lh.ma_lop, mh.ma_mon, mh.ten_mon, gv.ma_giang_vien, gv.ho_ten AS ten_gv, pc.trang_thai
+        rows = [dict(r) for r in conn.execute("""
+            SELECT pc.id, lh.ma_lop, mh.ma_mon, mh.ten_mon, gv.ma_giang_vien, gv.ho_ten AS ten_gv,
+                   pc.hoc_ky, pc.nam_hoc
             FROM phan_cong_giang_day pc
             JOIN lop_hoc lh ON pc.lop_hoc_id = lh.id
             JOIN mon_hoc mh ON pc.mon_hoc_id = mh.id
             JOIN giang_vien gv ON pc.giang_vien_id = gv.id
             ORDER BY pc.id DESC
-        """).fetchall()
-
-        gv_list = conn.execute("SELECT id, ma_giang_vien, ho_ten FROM giang_vien ORDER BY ho_ten").fetchall()
-        mh_list = conn.execute("SELECT id, ma_mon, ten_mon FROM mon_hoc ORDER BY ma_mon").fetchall()
-        lh_list = conn.execute("SELECT id, ma_lop, ten_lop FROM lop_hoc ORDER BY ma_lop").fetchall()
+        """).fetchall()]
+        for r in rows:
+            r["trang_thai"] = trang_thai_theo_thoi_gian(r["hoc_ky"], r["nam_hoc"])
+        out = {
+            "phan_cong": rows,
+            "giang_vien": [dict(g) for g in conn.execute("SELECT id, ma_giang_vien, ho_ten FROM giang_vien ORDER BY ho_ten")],
+            "mon_hoc": [dict(m) for m in conn.execute("SELECT id, ma_mon, ten_mon FROM mon_hoc ORDER BY ma_mon")],
+            "lop_hoc": [dict(l) for l in conn.execute("SELECT id, ma_lop, ten_lop FROM lop_hoc ORDER BY ma_lop")],
+            "hoc_ky": nhan_hoc_ky(),
+        }
         conn.close()
-
-        return jsonify({
-            "phan_cong": [dict(r) for r in rows],
-            "giang_vien": [dict(g) for g in gv_list],
-            "mon_hoc": [dict(m) for m in mh_list],
-            "lop_hoc": [dict(l) for l in lh_list]
-        })
+        return jsonify(out)
 
     body = request.get_json(silent=True) or {}
-    gv_id = body.get("giang_vien_id")
-    lop_id = body.get("lop_hoc_id")
-    mon_id = body.get("mon_id")
-    trang_thai = body.get("trang_thai", "DANG_DAY")
-
+    hk_now, nam_now = hoc_ky_hien_tai()
     try:
+        vals = (int(body["giang_vien_id"]), int(body["mon_id"]), int(body["lop_hoc_id"]),
+                int(body.get("hoc_ky") or hk_now), str(body.get("nam_hoc") or nam_now))
         conn.execute("""
-            INSERT INTO phan_cong_giang_day (giang_vien_id, lop_hoc_id, mon_hoc_id, trang_thai)
-            VALUES (?, ?, ?, ?)
-        """, (gv_id, lop_id, mon_id, trang_thai))
+            INSERT INTO phan_cong_giang_day (giang_vien_id, mon_hoc_id, lop_hoc_id, hoc_ky, nam_hoc)
+            VALUES (?, ?, ?, ?, ?)
+        """, vals)
         conn.commit()
+    except (KeyError, TypeError, ValueError):
+        conn.close()
+        return loi("Dữ liệu phân công không hợp lệ.")
     except sqlite3.IntegrityError:
         conn.close()
-        return loi("Phân công này đã tồn tại trong hệ thống.", 409)
-
+        return loi("Phân công này đã tồn tại hoặc tham chiếu sai dữ liệu.", 409)
     conn.close()
     return jsonify({"message": "Phân công thành công!"}), 201
 
 
 @app.route("/api/admin/phan-cong/<int:pc_id>", methods=["DELETE"])
 def api_admin_xoa_phan_cong(pc_id):
-    if not session.get("is_admin"):
-        return loi("Chỉ Quản trị viên mới được thao tác.", 403)
+    if (e := can_admin()):
+        return e
     conn = get_db_connection()
     conn.execute("DELETE FROM phan_cong_giang_day WHERE id = ?", (pc_id,))
     conn.commit()
