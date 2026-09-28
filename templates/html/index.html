@@ -1,79 +1,772 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/Logo_PTIT_University.png?v=1">
-    <title>Cổng Quản Lý Điểm Sinh Viên</title>
+    <title>Cổng Quản Lý Đào Tạo & Điểm Sinh Viên</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    >
-
-    <link rel="stylesheet" href="css/style.css">
+    <!-- CSS GỘP TRỰC TIẾP -->
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+        .class-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .class-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .grade-input {
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
 </head>
-
 <body class="bg-light">
 
-    <!-- NAVBAR -->
+    <!-- NAVBAR DÙNG CHUNG -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-
-        <div class="container">
-
-            <span class="navbar-brand fw-bold navbar-brand-static">
-                🏫 Cổng Giảng Viên: Quản Lý Điểm
-            </span>
-
+        <div class="container d-flex justify-content-between align-items-center">
+            <span class="navbar-brand fw-bold mb-0">🏫 Hệ Thống Quản Lý Điểm Học Phần</span>
+            
+            <div id="userHeader" class="d-none text-white d-flex align-items-center">
+                <span id="userTen" class="me-2 fw-bold"></span>
+                <span id="userBadge" class="badge me-3"></span>
+                <button class="btn btn-outline-light btn-sm me-2" data-bs-toggle="modal" data-bs-target="#doiPassModal">Đổi MK</button>
+                <button class="btn btn-danger btn-sm" onclick="dangXuat()">Đăng Xuất</button>
+            </div>
         </div>
-
     </nav>
 
-
-    <!-- NỘI DUNG -->
     <main class="container">
 
-        <div class="mb-4 text-center">
+        <!-- ==================== 1. MÀN HÌNH ĐĂNG NHẬP ==================== -->
+        <section id="viewLogin" class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white text-center fw-bold">
+                        ĐĂNG NHẬP CỔNG ĐÀO TẠO
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="alert alert-info py-2" style="font-size: 0.85rem;">
+                            <b>Tài khoản thử nghiệm (Mật khẩu chung: 123456):</b><br>
+                            - Giảng viên Quản trị (Admin): <b>GV001</b> hoặc <b>GV002</b><br>
+                            - Giảng viên thường: <b>GV006</b><br>
+                            - Sinh viên: <b>N24DCCN001</b>
+                        </div>
+                        <form id="formDangNhap">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tài khoản (Mã GV hoặc MSSV):</label>
+                                <input type="text" id="loginTk" class="form-control" placeholder="Nhập GV001 hoặc N24DCCN001..." required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Mật khẩu:</label>
+                                <input type="password" id="loginMk" class="form-control" placeholder="Nhập mật khẩu..." required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold">Đăng Nhập</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-            <h2 class="fw-bold text-primary">
-                🏫 CỔNG QUẢN LÝ ĐIỂM SINH VIÊN
-            </h2>
 
-            <p class="text-muted">
-                Chọn lớp học bên dưới để mở sổ điểm
-                và nhập điểm theo từng môn học.
-            </p>
+        <!-- ==================== 2. MÀN HÌNH SINH VIÊN (CHỈ XEM ĐIỂM) ==================== -->
+        <section id="viewSinhVien" class="d-none">
+            <div class="card shadow-sm border-primary mb-4">
+                <div class="card-body">
+                    <h4 class="text-primary fw-bold" id="svHoTenTitle"></h4>
+                    <p class="text-muted mb-0">
+                        MSSV: <strong id="svMssv"></strong> | 
+                        Lớp: <span id="svLop" class="badge bg-secondary"></span> | 
+                        Ngành: <span id="svNganh"></span>
+                    </p>
+                </div>
+            </div>
 
-        </div>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white fw-bold">📝 Bảng Điểm Cá Nhân Tích Lũy</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover text-center align-middle mb-0">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>Mã Môn</th>
+                                    <th class="text-start">Tên Môn Học</th>
+                                    <th>Số TC</th>
+                                    <th>Điểm Quá Trình (40%)</th>
+                                    <th>Điểm Cuối Kỳ (60%)</th>
+                                    <th>Tổng Kết</th>
+                                    <th>Xếp Loại</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bangDiemSvBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
 
 
-        <!-- DANH SÁCH LỚP -->
-
-        <div
-            id="classList"
-            class="row g-4"
-        >
-
-            <!-- JavaScript sẽ tạo danh sách lớp ở đây -->
-
-        </div>
+        <!-- ==================== 3. MÀN HÌNH DANH SÁCH LỚP (GIẢNG VIÊN) ==================== -->
+        <section id="viewDanhSachLop" class="d-none">
+            <div class="mb-4 text-center">
+                <h3 class="fw-bold text-primary">DANH SÁCH LỚP HỌC PHẦN</h3>
+                <p class="text-muted">Chọn lớp học bên dưới để mở sổ điểm và quản lý sinh viên.</p>
+            </div>
+            <div id="classList" class="row g-4"></div>
+        </section>
 
 
-        <!-- THÔNG BÁO -->
+        <!-- ==================== 4. MÀN HÌNH SỔ ĐIỂM CHI TIẾT CỦA LỚP ==================== -->
+        <section id="viewSoDiemLop" class="d-none">
+            <div class="mb-3">
+                <button class="btn btn-outline-secondary btn-sm" onclick="quayLaiDanhSachLop()">
+                    ⬅ Quay lại danh sách lớp
+                </button>
+            </div>
 
-        <div
-            id="loading"
-            class="text-center text-muted"
-        >
-            Đang tải danh sách lớp...
-        </div>
+            <!-- THÔNG TIN LỚP & CHỌN MÔN -->
+            <div class="card shadow-sm mb-4 border-primary">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-5">
+                            <h3 class="fw-bold text-primary mb-1">Lớp: <span id="labelMaLop"></span></h3>
+                            <span class="badge bg-secondary">Sĩ số: <span id="labelSiSo">0</span> Sinh viên</span>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="d-flex align-items-center justify-content-md-end mt-3 mt-md-0">
+                                <label class="fw-bold me-2 text-nowrap">📚 Nhập điểm cho Môn:</label>
+                                <select id="selectMonHoc" class="form-select w-auto me-2 fw-bold" onchange="doiMonHoc()"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TÌM KIẾM + NÚT THÊM SINH VIÊN (CHỈ ADMIN THẤY) -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex w-50">
+                    <input type="text" id="searchInput" class="form-control me-2" placeholder="Tìm theo tên hoặc MSSV..." oninput="timSinhVien()">
+                    <button class="btn btn-secondary ms-2 text-nowrap" onclick="boLoc()">Bỏ lọc</button>
+                </div>
+                <!-- Nút này được JS hiển thị nếu là Admin -->
+                <button type="button" id="btnAddStudent" class="btn btn-success d-none" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+                    + Thêm Sinh Viên Mới
+                </button>
+            </div>
+
+            <!-- BẢNG ĐIỂM -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">📝 Sổ Điểm: <span id="labelTenMon"></span> (<span id="labelMaMon"></span>)</span>
+                    <button class="btn btn-warning btn-sm fw-bold" onclick="luuDiem()">💾 Lưu Toàn Bộ Bảng Điểm</button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover text-center align-middle mb-0">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th style="width: 45px;">STT</th>
+                                    <th style="width: 130px;">MSSV</th>
+                                    <th class="text-start">Họ và Tên</th>
+                                    <th>Chuyên Ngành</th>
+                                    <th style="width: 130px;">Quá Trình (40%)</th>
+                                    <th style="width: 130px;">Cuối Kỳ (60%)</th>
+                                    <th style="width: 100px;">Tổng Kết</th>
+                                    <th style="width: 110px;">Xếp Loại</th>
+                                    <th style="width: 135px;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-end">
+                    <button class="btn btn-warning fw-bold" onclick="luuDiem()">💾 Lưu Toàn Bộ Bảng Điểm</button>
+                </div>
+            </div>
+        </section>
 
     </main>
 
 
-    <script src="js/index.js"></script>
+    <!-- ==================== CÁC MODAL DIALOGS ==================== -->
 
+    <!-- MODAL 1: ĐỔI MẬT KHẨU -->
+    <div class="modal fade" id="doiPassModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="formDoiPass">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title">Đổi Mật Khẩu Cá Nhân</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Mật khẩu cũ:</label>
+                            <input type="password" id="passCu" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mật khẩu mới (>= 6 ký tự):</label>
+                            <input type="password" id="passMoi" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Xác Nhận</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: THÊM SINH VIÊN (CHỈ ADMIN) -->
+    <div class="modal fade" id="addStudentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="addStudentForm">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">Thêm Sinh Viên Mới (Quyền Quản Trị)</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label class="form-label">MSSV:</label>
+                            <input type="text" id="addMssv" class="form-control" placeholder="VD: N24DCCN099" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Họ và Tên:</label>
+                            <input type="text" id="addHoTen" class="form-control" placeholder="VD: Nguyễn Hoàng An" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Chuyên Ngành:</label>
+                            <input type="text" id="addChuyenNganh" class="form-control" value="Cong nghe Thong tin">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Gmail:</label>
+                            <input type="email" id="addGmail" class="form-control" placeholder="example@gmail.com">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Số Điện Thoại:</label>
+                            <input type="text" id="addSdt" class="form-control" placeholder="0987654321">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-success">Thêm Sinh Viên</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: SỬA SINH VIÊN (CHỈ ADMIN) -->
+    <div class="modal fade" id="editStudentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="editStudentForm">
+                    <input type="hidden" id="editSvId">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Sửa Thông Tin Sinh Viên (Quyền Quản Trị)</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label class="form-label">MSSV (Không thể đổi):</label>
+                            <input type="text" id="editMssv" class="form-control bg-light" readonly>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Họ và Tên:</label>
+                            <input type="text" id="editHoTen" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Chuyên Ngành:</label>
+                            <input type="text" id="editChuyenNganh" class="form-control">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Gmail:</label>
+                            <input type="email" id="editGmail" class="form-control">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Số Điện Thoại:</label>
+                            <input type="text" id="editSdt" class="form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Lưu Thay Đổi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==================== JAVASCRIPT GỘP TRỰC TIẾP (.THEN) ==================== -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // --- CÁC BIẾN TOÀN CỤC ---
+        let currentUser = null;
+        let currentLop = null;
+        let currentMonId = null;
+        let studentsList = [];
+        let subjectsList = [];
+
+        function esc(s) {
+            return String(s ?? "").replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[c]));
+        }
+
+        // Tự động kiểm tra phiên đăng nhập khi mở trang
+        window.addEventListener("DOMContentLoaded", function() {
+            fetch("/api/me")
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.authenticated) {
+                        currentUser = data.user;
+                        hienThiGiaoDienNguoiDung();
+                    } else {
+                        chuyenManHinh("viewLogin");
+                    }
+                })
+                .catch(function(err) { console.error("Lỗi:", err); });
+        });
+
+        // Hàm điều hướng hiển thị các màn hình (SPA)
+        function chuyenManHinh(viewId) {
+            document.getElementById("viewLogin").classList.add("d-none");
+            document.getElementById("viewSinhVien").classList.add("d-none");
+            document.getElementById("viewDanhSachLop").classList.add("d-none");
+            document.getElementById("viewSoDiemLop").classList.add("d-none");
+            document.getElementById(viewId).classList.remove("d-none");
+        }
+
+        function hienThiGiaoDienNguoiDung() {
+            document.getElementById("userHeader").classList.remove("d-none");
+            document.getElementById("userTen").textContent = currentUser.ho_ten;
+
+            let badgeText = "Sinh viên";
+            let badgeClass = "badge bg-secondary me-3";
+
+            if (currentUser.vai_tro !== "SINH_VIEN") {
+                badgeText = currentUser.is_admin ? "Quản Trị Viên (Admin)" : "Giảng Viên";
+                badgeClass = currentUser.is_admin ? "badge bg-danger me-3" : "badge bg-primary me-3";
+                document.getElementById("userBadge").textContent = badgeText;
+                document.getElementById("userBadge").className = badgeClass;
+                chuyenManHinh("viewDanhSachLop");
+                taiDanhSachLop();
+            } else {
+                document.getElementById("userBadge").textContent = badgeText;
+                document.getElementById("userBadge").className = badgeClass;
+                chuyenManHinh("viewSinhVien");
+                taiDiemSinhVien();
+            }
+        }
+
+        // 1. XỬ LÝ ĐĂNG NHẬP
+        document.getElementById("formDangNhap").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const tk = document.getElementById("loginTk").value.trim();
+            const mk = document.getElementById("loginMk").value.trim();
+
+            fetch("/api/dang-nhap", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tai_khoan: tk, mat_khau: mk })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) { return { status: res.status, data: data }; });
+            })
+            .then(function(resObj) {
+                if (resObj.status !== 200) {
+                    alert(resObj.data.message || "Đăng nhập thất bại.");
+                } else {
+                    currentUser = resObj.data.user;
+                    hienThiGiaoDienNguoiDung();
+                }
+            })
+            .catch(function() { alert("Không thể kết nối máy chủ."); });
+        });
+
+        // 2. ĐĂNG XUẤT
+        function dangXuat() {
+            fetch("/api/dang-xuat", { method: "POST" })
+                .then(function() { location.reload(); });
+        }
+
+        // 3. ĐỔI MẬT KHẨU
+        document.getElementById("formDoiPass").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const passCu = document.getElementById("passCu").value.trim();
+            const passMoi = document.getElementById("passMoi").value.trim();
+
+            fetch("/api/doi-mat-khau", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mk_cu: passCu, mk_moi: passMoi })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) { return { status: res.status, data: data }; });
+            })
+            .then(function(resObj) {
+                alert(resObj.data.message);
+                if (resObj.status === 200) {
+                    document.getElementById("formDoiPass").reset();
+                    bootstrap.Modal.getInstance(document.getElementById("doiPassModal")).hide();
+                }
+            });
+        });
+
+        // 4. SINH VIÊN: XEM BẢNG ĐIỂM CÁ NHÂN
+        function taiDiemSinhVien() {
+            fetch("/api/sinh-vien/bang-diem")
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    const sv = data.sinh_vien;
+                    document.getElementById("svHoTenTitle").textContent = sv.ho_ten;
+                    document.getElementById("svMssv").textContent = sv.mssv;
+                    document.getElementById("svLop").textContent = sv.ma_lop;
+                    document.getElementById("svNganh").textContent = sv.chuyen_nganh;
+
+                    const tbody = document.getElementById("bangDiemSvBody");
+                    tbody.innerHTML = "";
+
+                    data.bang_diem.forEach(function(mh) {
+                        const qt = (mh.diem_qt !== null && mh.diem_qt !== undefined) ? mh.diem_qt : "Chưa có";
+                        const ck = (mh.diem_ck !== null && mh.diem_ck !== undefined) ? mh.diem_ck : "Chưa có";
+                        const tk = (mh.diem_tk !== null && mh.diem_tk !== undefined) 
+                            ? `<strong class="text-primary">${mh.diem_tk}</strong>` 
+                            : `<span class="text-muted">Chưa có</span>`;
+                        
+                        let xepLoai = `<span class="badge bg-light text-muted border">Chưa xét</span>`;
+                        if (mh.diem_tk !== null && mh.diem_tk !== undefined) {
+                            const d = Number(mh.diem_tk);
+                            if (d >= 8.5) xepLoai = `<span class="badge bg-success">Giỏi (A)</span>`;
+                            else if (d >= 7.0) xepLoai = `<span class="badge bg-info text-dark">Khá (B)</span>`;
+                            else if (d >= 5.5) xepLoai = `<span class="badge bg-warning text-dark">TB (C)</span>`;
+                            else if (d >= 4.0) xepLoai = `<span class="badge bg-secondary">Yếu (D)</span>`;
+                            else xepLoai = `<span class="badge bg-danger">Học Lại (F)</span>`;
+                        }
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><b>${esc(mh.ma_mon)}</b></td>
+                                <td class="text-start">${esc(mh.ten_mon)}</td>
+                                <td>${mh.so_tin_chi}</td>
+                                <td>${qt}</td>
+                                <td>${ck}</td>
+                                <td>${tk}</td>
+                                <td>${xepLoai}</td>
+                            </tr>
+                        `;
+                    });
+                });
+        }
+
+        // 5. GIẢNG VIÊN: XEM DANH SÁCH LỚP HỌC
+        function taiDanhSachLop() {
+            fetch("/api/classes")
+                .then(function(res) { return res.json(); })
+                .then(function(classes) {
+                    const classList = document.getElementById("classList");
+                    classList.innerHTML = "";
+                    classes.forEach(function(c) {
+                        const card = document.createElement("div");
+                        card.className = "col-md-4";
+                        card.innerHTML = `
+                            <div class="card shadow-sm border-primary h-100 class-card">
+                                <div class="card-body text-center p-4">
+                                    <h4 class="card-title fw-bold text-primary">${esc(c.ma_lop)}</h4>
+                                    <p class="text-muted mb-3">Sĩ số: <strong>${c.so_luong_sv}</strong> sinh viên</p>
+                                    <button class="btn btn-primary w-100 fw-bold" onclick="moSoDiemLop('${c.ma_lop}')">
+                                        👉 Vào Sổ Điểm
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        classList.appendChild(card);
+                    });
+                });
+        }
+
+        // 6. GIẢNG VIÊN: MỞ SỔ ĐIỂM CHI TIẾT
+        function moSoDiemLop(maLop) {
+            currentLop = maLop;
+            currentMonId = null;
+            chuyenManHinh("viewSoDiemLop");
+            document.getElementById("labelMaLop").textContent = maLop;
+
+            // Kiểm tra quyền Admin để ẩn/hiện nút thêm sinh viên
+            if (currentUser && currentUser.is_admin) {
+                document.getElementById("btnAddStudent").classList.remove("d-none");
+            } else {
+                document.getElementById("btnAddStudent").classList.add("d-none");
+            }
+
+            taiDuLieuLopVaDiem();
+        }
+
+        function quayLaiDanhSachLop() {
+            chuyenManHinh("viewDanhSachLop");
+            taiDanhSachLop();
+        }
+
+        function taiDuLieuLopVaDiem() {
+            let url = `/api/class/${encodeURIComponent(currentLop)}`;
+            if (currentMonId) {
+                url += `?mon_id=${encodeURIComponent(currentMonId)}`;
+            }
+
+            fetch(url)
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    studentsList = data.students;
+                    subjectsList = data.subjects;
+                    currentMonId = String(data.current_mon_id);
+
+                    hienThiDropdownMonHoc();
+                    hienThiBangSinhVien();
+                })
+                .catch(function(err) { alert("Không thể tải sổ điểm: " + err); });
+        }
+
+        function hienThiDropdownMonHoc() {
+            const select = document.getElementById("selectMonHoc");
+            select.innerHTML = "";
+            subjectsList.forEach(function(mon) {
+                const opt = document.createElement("option");
+                opt.value = mon.id;
+                opt.textContent = `${mon.ma_mon} - ${mon.ten_mon} (${mon.so_tin_chi} TC)`;
+                if (String(mon.id) === String(currentMonId)) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            const monHienTai = subjectsList.find(function(m) { return String(m.id) === String(currentMonId); });
+            if (monHienTai) {
+                document.getElementById("labelTenMon").textContent = monHienTai.ten_mon;
+                document.getElementById("labelMaMon").textContent = monHienTai.ma_mon;
+            }
+        }
+
+        function doiMonHoc() {
+            currentMonId = document.getElementById("selectMonHoc").value;
+            taiDuLieuLopVaDiem();
+        }
+
+        function hienThiBangSinhVien() {
+            const tbody = document.getElementById("studentTableBody");
+            tbody.innerHTML = "";
+            document.getElementById("labelSiSo").textContent = studentsList.length;
+
+            if (studentsList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-muted py-4">Chưa có sinh viên nào trong lớp.</td></tr>`;
+                return;
+            }
+
+            studentsList.forEach(function(sv, index) {
+                const tr = document.createElement("tr");
+
+                let nutThaoTac = `<span class="text-muted fst-italic">Chỉ xem</span>`;
+                if (currentUser && currentUser.is_admin) {
+                    nutThaoTac = `
+                        <button class="btn btn-outline-primary btn-sm me-1" onclick="moModalSua(${sv.sv_id})">Sửa</button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="xoaSinhVien(${sv.sv_id})">Xóa</button>
+                    `;
+                }
+
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><strong>${esc(sv.mssv)}</strong></td>
+                    <td class="text-start">${esc(sv.ho_ten)}</td>
+                    <td><small class="text-muted">${esc(sv.chuyen_nganh)}</small></td>
+                    <td>
+                        <input type="number" step="0.1" min="0" max="10"
+                               class="form-control form-control-sm text-center fw-bold"
+                               id="qt_${sv.sv_id}" value="${sv.diem_qt ?? ""}">
+                    </td>
+                    <td>
+                        <input type="number" step="0.1" min="0" max="10"
+                               class="form-control form-control-sm text-center fw-bold"
+                               id="ck_${sv.sv_id}" value="${sv.diem_ck ?? ""}">
+                    </td>
+                    <td id="tk_${sv.sv_id}">${hienThiTongKet(sv.diem_tk)}</td>
+                    <td id="loai_${sv.sv_id}">${tinhXepLoai(sv.diem_tk)}</td>
+                    <td>${nutThaoTac}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Tự động tính điểm tổng kết khi gõ
+        document.getElementById("studentTableBody").addEventListener("input", function(e) {
+            const id = e.target.id;
+            if (!id.startsWith("qt_") && !id.startsWith("ck_")) return;
+
+            const svId = id.slice(3);
+            const qt = document.getElementById(`qt_${svId}`).value;
+            const ck = document.getElementById(`ck_${svId}`).value;
+
+            let tk = null;
+            if (qt !== "" && ck !== "") {
+                tk = (Number(qt) * 0.4 + Number(ck) * 0.6).toFixed(1);
+            }
+
+            document.getElementById(`tk_${svId}`).innerHTML = hienThiTongKet(tk);
+            document.getElementById(`loai_${svId}`).innerHTML = tinhXepLoai(tk);
+        });
+
+        function hienThiTongKet(diem) {
+            if (diem === null || diem === undefined) return `<span class="text-muted fst-italic">Chưa có</span>`;
+            return `<strong class="text-primary fs-6">${diem}</strong>`;
+        }
+
+        function tinhXepLoai(diem) {
+            if (diem === null || diem === undefined) return `<span class="badge bg-light text-muted border">Chưa xét</span>`;
+            diem = Number(diem);
+            if (diem >= 8.5) return `<span class="badge bg-success">Giỏi (A)</span>`;
+            if (diem >= 7.0) return `<span class="badge bg-info text-dark">Khá (B)</span>`;
+            if (diem >= 5.5) return `<span class="badge bg-warning text-dark">TB (C)</span>`;
+            if (diem >= 4.0) return `<span class="badge bg-secondary">Yếu (D)</span>`;
+            return `<span class="badge bg-danger">Học Lại (F)</span>`;
+        }
+
+        // 7. LƯU ĐIỂM
+        function luuDiem() {
+            const gradesData = [];
+            for (const sv of studentsList) {
+                const qt = document.getElementById(`qt_${sv.sv_id}`).value;
+                const ck = document.getElementById(`ck_${sv.sv_id}`).value;
+                const diemQt = qt === "" ? null : Number(qt);
+                const diemCk = ck === "" ? null : Number(ck);
+
+                const hopLe = function(d) { return d === null || (d >= 0 && d <= 10); };
+                if (!hopLe(diemQt) || !hopLe(diemCk)) {
+                    alert(`Điểm của ${sv.mssv} phải từ 0 đến 10.`);
+                    return;
+                }
+                gradesData.push({ sv_id: sv.sv_id, diem_qt: diemQt, diem_ck: diemCk });
+            }
+
+            fetch(`/api/class/${encodeURIComponent(currentLop)}/update-grades`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mon_id: Number(currentMonId), grades: gradesData })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) { return { status: res.status, data: data }; });
+            })
+            .then(function(resObj) {
+                alert(resObj.data.message);
+                if (resObj.status === 200) taiDuLieuLopVaDiem();
+            });
+        }
+
+        // 8. TÌM KIẾM SINH VIÊN
+        function timSinhVien() {
+            const keyword = document.getElementById("searchInput").value.trim().toLowerCase();
+            document.querySelectorAll("#studentTableBody tr").forEach(function(row) {
+                if (row.cells.length < 3) return;
+                const text = (row.cells[1].textContent + " " + row.cells[2].textContent).toLowerCase();
+                row.style.display = text.includes(keyword) ? "" : "none";
+            });
+        }
+        function boLoc() {
+            document.getElementById("searchInput").value = "";
+            timSinhVien();
+        }
+
+        // 9. QUẢN TRỊ VIÊN: THÊM SINH VIÊN
+        document.getElementById("addStudentForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const mssv = document.getElementById("addMssv").value.trim();
+            const hoTen = document.getElementById("addHoTen").value.trim();
+            const chuyenNganh = document.getElementById("addChuyenNganh").value.trim();
+            const gmail = document.getElementById("addGmail").value.trim();
+            const sdt = document.getElementById("addSdt").value.trim();
+
+            fetch(`/api/class/${encodeURIComponent(currentLop)}/add-student`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mssv: mssv, ho_ten: hoTen, chuyen_nganh: chuyenNganh, gmail: gmail, sdt: sdt })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) { return { status: res.status, data: data }; });
+            })
+            .then(function(resObj) {
+                alert(resObj.data.message);
+                if (resObj.status === 201) {
+                    document.getElementById("addStudentForm").reset();
+                    bootstrap.Modal.getInstance(document.getElementById("addStudentModal")).hide();
+                    taiDuLieuLopVaDiem();
+                }
+            });
+        });
+
+        // 10. QUẢN TRỊ VIÊN: MỞ MODAL & SỬA SINH VIÊN
+        function moModalSua(svId) {
+            const sv = studentsList.find(function(s) { return s.sv_id === svId; });
+            if (!sv) return;
+
+            document.getElementById("editSvId").value = sv.sv_id;
+            document.getElementById("editMssv").value = sv.mssv;
+            document.getElementById("editHoTen").value = sv.ho_ten;
+            document.getElementById("editChuyenNganh").value = sv.chuyen_nganh ?? "";
+            document.getElementById("editGmail").value = sv.gmail ?? "";
+            document.getElementById("editSdt").value = sv.sdt ?? "";
+
+            const modal = new bootstrap.Modal(document.getElementById("editStudentModal"));
+            modal.show();
+        }
+
+        document.getElementById("editStudentForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const svId = document.getElementById("editSvId").value;
+            const hoTen = document.getElementById("editHoTen").value.trim();
+            const chuyenNganh = document.getElementById("editChuyenNganh").value.trim();
+            const gmail = document.getElementById("editGmail").value.trim();
+            const sdt = document.getElementById("editSdt").value.trim();
+
+            fetch(`/api/class/${encodeURIComponent(currentLop)}/edit-student/${svId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ho_ten: hoTen, chuyen_nganh: chuyenNganh, gmail: gmail, sdt: sdt })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) { return { status: res.status, data: data }; });
+            })
+            .then(function(resObj) {
+                alert(resObj.data.message);
+                if (resObj.status === 200) {
+                    bootstrap.Modal.getInstance(document.getElementById("editStudentModal")).hide();
+                    taiDuLieuLopVaDiem();
+                }
+            });
+        });
+
+        // 11. QUẢN TRỊ VIÊN: XÓA SINH VIÊN
+        function xoaSinhVien(svId) {
+            if (!confirm("Bạn có chắc chắn muốn xóa sinh viên này? Tài khoản và toàn bộ điểm liên quan sẽ bị xóa sạch.")) {
+                return;
+            }
+
+            fetch(`/api/class/${encodeURIComponent(currentLop)}/delete-student/${svId}`, {
+                method: "DELETE"
+            })
+            .then(function(res) {
+                return res.json().then(function(data) { return { status: res.status, data: data }; });
+            })
+            .then(function(resObj) {
+                alert(resObj.data.message);
+                if (resObj.status === 200) taiDuLieuLopVaDiem();
+            });
+        }
+    </script>
 </body>
-
 </html>

@@ -6,7 +6,7 @@
   ],
 
   "nguoi_dung": [
-    { "id": 1, "ten_dang_nhap": "GV001", "mat_khau": "pbkdf2:sha256:100000$hashed_password", "vai_tro_id": 1, "trang_thai": true },
+    { "id": 1, "ten_dang_nhap": "GV001", "mat_khau": "123456", "vai_tro_id": 1, "trang_thai": true },
     { "id": 2, "ten_dang_nhap": "GV002", "mat_khau": "pbkdf2:sha256:100000$hashed_password", "vai_tro_id": 1, "trang_thai": true },
     { "id": 3, "ten_dang_nhap": "GV003", "mat_khau": "pbkdf2:sha256:100000$hashed_password", "vai_tro_id": 1, "trang_thai": true },
     { "id": 4, "ten_dang_nhap": "GV004", "mat_khau": "pbkdf2:sha256:100000$hashed_password", "vai_tro_id": 1, "trang_thai": true },
