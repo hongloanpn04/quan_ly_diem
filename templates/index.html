@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-4 text-center">
+    <h2 class="fw-bold text-primary">🏫 CỔNG QUẢN LÝ ĐIỂM SINH VIÊN</h2>
+    <p class="text-muted">Chọn lớp học bên dưới để mở sổ điểm và nhập điểm theo từng môn học.</p>
+</div>
+
+<div class="row g-4">
+    {% for c in classes %}
+    <div class="col-md-4">
+        <div class="card shadow-sm border-primary h-100">
+            <div class="card-body text-center p-4">
+                <h4 class="card-title fw-bold text-primary">{{ c['ma_lop'] }}</h4>
+                <p class="text-muted mb-3">Sĩ số: <strong>{{ c['so_luong_sv'] }}</strong> sinh viên</p>
+                <a href="/class/{{ c['ma_lop'] }}" class="btn btn-primary w-100 fw-bold">
+                    👉 Vào Sổ Điểm
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="alert alert-info text-center">Chưa có dữ liệu lớp học nào.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
