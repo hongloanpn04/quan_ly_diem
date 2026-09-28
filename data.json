@@ -1,0 +1,87 @@
+{
+  "giang_vien": [
+    {
+      "id": 1,
+      "ma_gv": "gv01",
+      "mat_khau": "123456",
+      "name": "ThS. Nguyen Van Thuan",
+      "vai_tro": "quan_tri"
+    },
+    {
+      "id": 2,
+      "ma_gv": "gv02",
+      "mat_khau": "123456",
+      "name": "TS. Le Thi Mai Hoa",
+      "vai_tro": "giang_vien"
+    }
+  ],
+  "sinh_vien": [
+    {
+      "id": 1,
+      "ma_sv": "sv01",
+      "mat_khau": "123456",
+      "name": "Pham Ngoc Hong Loan",
+      "lop": "D22CQCN01-N"
+    },
+    {
+      "id": 2,
+      "ma_sv": "sv02",
+      "mat_khau": "123456",
+      "name": "Tran Quoc Bao",
+      "lop": "D22CQCN01-N"
+    },
+    {
+      "id": 3,
+      "ma_sv": "sv03",
+      "mat_khau": "123456",
+      "name": "Le Thi Thu Trang",
+      "lop": "D22CQCN01-N"
+    }
+  ],
+  "lop_hoc_phan": [
+    {
+      "id": 1,
+      "ma_mon": "INT1306",
+      "ten_mon": "Mang May Tinh",
+      "giang_vien_id": 1
+    },
+    {
+      "id": 2,
+      "ma_mon": "INT1340",
+      "ten_mon": "Co So Du Lieu",
+      "giang_vien_id": 2
+    }
+  ],
+  "bang_diem": [
+    {
+      "id": 1,
+      "sinh_vien_id": 1,
+      "lop_id": 1,
+      "diem": 9.2
+    },
+    {
+      "id": 2,
+      "sinh_vien_id": 1,
+      "lop_id": 2,
+      "diem": 9.5
+    },
+    {
+      "id": 3,
+      "sinh_vien_id": 2,
+      "lop_id": 1,
+      "diem": 7.5
+    },
+    {
+      "id": 4,
+      "sinh_vien_id": 2,
+      "lop_id": 2,
+      "diem": 8.0
+    },
+    {
+      "id": 5,
+      "sinh_vien_id": 3,
+      "lop_id": 2,
+      "diem": 5.0
+    }
+  ]
+}

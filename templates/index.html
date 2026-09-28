@@ -1,27 +1,249 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="mb-4 text-center">
-    <h2 class="fw-bold text-primary">🏫 CỔNG QUẢN LÝ ĐIỂM SINH VIÊN</h2>
-    <p class="text-muted">Chọn lớp học bên dưới để mở sổ điểm và nhập điểm theo từng môn học.</p>
-</div>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Điểm Sinh Viên</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px auto; max-width: 800px; background: #f4f6f8; }
+        .the { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        input, select { padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .nut-do { background: #dc3545; }
+        .nut-do:hover { background: #bd2130; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f8f9fa; }
+        .an { display: none; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
 
-<div class="row g-4">
-    {% for c in classes %}
-    <div class="col-md-4">
-        <div class="card shadow-sm border-primary h-100">
-            <div class="card-body text-center p-4">
-                <h4 class="card-title fw-bold text-primary">{{ c['ma_lop'] }}</h4>
-                <p class="text-muted mb-3">Sĩ số: <strong>{{ c['so_luong_sv'] }}</strong> sinh viên</p>
-                <a href="/class/{{ c['ma_lop'] }}" class="btn btn-primary w-100 fw-bold">
-                    👉 Vào Sổ Điểm
-                </a>
+    <!-- 1. MÀN HÌNH ĐĂNG NHẬP -->
+    <div id="box-dang-nhap" class="the">
+        <h2>Đăng Nhập Cổng Điểm</h2>
+        <p style="color: gray;">Tài khoản test: <b>gv01</b> (Admin), <b>gv02</b> (Giảng viên), <b>sv01</b> (Sinh viên) - Pass: <b>123456</b></p>
+        <input type="text" id="tk" placeholder="Mã GV hoặc MSSV" style="width: 95%;"><br>
+        <input type="password" id="mk" placeholder="Mật khẩu" style="width: 95%;"><br>
+        <button onclick="dangNhap()">Đăng Nhập</button>
+    </div>
+
+    <!-- 2. PHẦN HIỂN THỊ SAU KHI ĐĂNG NHẬP -->
+    <div id="box-chinh" class="an">
+        <div class="the topbar">
+            <div>Xin chào: <b id="ten-nguoi-dung"></b> (<span id="vai-tro-hien-thi"></span>)</div>
+            <button class="nut-do" onclick="dangXuat()">Đăng Xuất</button>
+        </div>
+
+        <!-- Giao diện của Sinh viên -->
+        <div id="vung-sinh-vien" class="the an">
+            <h3>Bảng Điểm Cá Nhân Của Bạn</h3>
+            <table>
+                <thead>
+                    <tr><th>Mã Môn</th><th>Tên Môn Học</th><th>Điểm Tổng Kết</th></tr>
+                </thead>
+                <tbody id="bang-diem-sv"></tbody>
+            </table>
+        </div>
+
+        <!-- Giao diện của Giảng viên -->
+        <div id="vung-giang-vien" class="an">
+            
+            <!-- Chỉ Quản trị viên mới thấy phần Thêm Sinh Viên này -->
+            <div id="vung-admin" class="the an">
+                <h3>Quản Trị: Thêm Sinh Viên Mới</h3>
+                <input type="text" id="admin-ma" placeholder="Mã SV (vd: sv04)">
+                <input type="text" id="admin-ten" placeholder="Họ và tên">
+                <input type="text" id="admin-lop" placeholder="Lớp">
+                <button onclick="adminThemSV()">Thêm</button>
+
+                <h4 style="margin-top: 15px;">Danh Sách Sinh Viên</h4>
+                <table>
+                    <thead><tr><th>Mã SV</th><th>Họ Tên</th><th>Lớp</th><th>Xóa</th></tr></thead>
+                    <tbody id="bang-admin-sv"></tbody>
+                </table>
             </div>
+
+            <!-- Giảng viên nào cũng dùng được phần Nhập Điểm này -->
+            <div class="the">
+                <h3>Vào Điểm Theo Lớp</h3>
+                Chọn lớp học:
+                <select id="chon-lop" onchange="taiDiemTheoLop()"></select>
+
+                <table>
+                    <thead>
+                        <tr><th>Mã SV</th><th>Họ Tên</th><th>Điểm (0-10)</th><th>Thao Tác</th></tr>
+                    </thead>
+                    <tbody id="bang-nhap-diem"></tbody>
+                </table>
+            </div>
+
         </div>
     </div>
-    {% else %}
-    <div class="col-12">
-        <div class="alert alert-info text-center">Chưa có dữ liệu lớp học nào.</div>
-    </div>
-    {% endfor %}
-</div>
-{% endblock %}
+
+    <!-- CODE XỬ LÝ FETCH API VỚI .THEN() -->
+    <script>
+        // 1. ĐĂNG NHẬP
+        function dangNhap() {
+            var tk = document.getElementById("tk").value;
+            var mk = document.getElementById("mk").value;
+
+            fetch("/api/dang-nhap", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tai_khoan: tk, mat_khau: mk })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    hienThiGiaoDien(data);
+                } else {
+                    alert(data.tin_nhan);
+                }
+            });
+        }
+
+        // 2. ĐĂNG XUẤT
+        function dangXuat() {
+            fetch("/api/dang-xuat", { method: "POST" })
+            .then(function() {
+                location.reload();
+            });
+        }
+
+        // 3. HIỂN THỊ MÀN HÌNH THEO VAI TRÒ
+        function hienThiGiaoDien(user) {
+            document.getElementById("box-dang-nhap").classList.add("an");
+            document.getElementById("box-chinh").classList.remove("an");
+            document.getElementById("ten-nguoi-dung").innerText = user.ten;
+            document.getElementById("vai-tro-hien-thi").innerText = user.vai_tro;
+
+            if (!user.la_gv) {
+                // Là Sinh viên -> Chỉ hiển thị bảng điểm
+                document.getElementById("vung-sinh-vien").classList.remove("an");
+                taiDiemSinhVien();
+            } else {
+                // Là Giảng viên
+                document.getElementById("vung-giang-vien").classList.remove("an");
+                if (user.vai_tro === "quan_tri") {
+                    document.getElementById("vung-admin").classList.remove("an");
+                    adminTaiDS();
+                }
+                taiDanhSachLop();
+            }
+        }
+
+        // 4. SINH VIÊN XEM ĐIỂM
+        function taiDiemSinhVien() {
+            fetch("/api/sv-xem-diem")
+            .then(function(res) { return res.json(); })
+            .then(function(danhSach) {
+                var tbody = document.getElementById("bang-diem-sv");
+                tbody.innerHTML = "";
+                danhSach.forEach(function(mon) {
+                    tbody.innerHTML += "<tr><td>" + mon.ma_mon + "</td><td>" + mon.ten_mon + "</td><td style='color:blue; font-weight:bold;'>" + mon.diem + "</td></tr>";
+                });
+            });
+        }
+
+        // 5. GIẢNG VIÊN TẢI DANH SÁCH LỚP VÀO SELECT
+        function taiDanhSachLop() {
+            fetch("/api/gv-lop-hoc")
+            .then(function(res) { return res.json(); })
+            .then(function(danhSach) {
+                var select = document.getElementById("chon-lop");
+                select.innerHTML = "<option value=''>-- Chọn lớp --</option>";
+                danhSach.forEach(function(lop) {
+                    select.innerHTML += "<option value='" + lop.id + "'>" + lop.ma_mon + " - " + lop.ten_mon + "</option>";
+                });
+            });
+        }
+
+        // 6. GIẢNG VIÊN TẢI DANH SÁCH SINH VIÊN ĐỂ NHẬP ĐIỂM
+        function taiDiemTheoLop() {
+            var lopId = document.getElementById("chon-lop").value;
+            if (!lopId) return;
+
+            fetch("/api/gv-bang-diem-lop?lop_id=" + lopId)
+            .then(function(res) { return res.json(); })
+            .then(function(danhSach) {
+                var tbody = document.getElementById("bang-nhap-diem");
+                tbody.innerHTML = "";
+                danhSach.forEach(function(sv) {
+                    tbody.innerHTML += "<tr>" +
+                        "<td>" + sv.ma_sv + "</td>" +
+                        "<td>" + sv.ten_sv + "</td>" +
+                        "<td><input type='number' step='0.1' id='diem-" + sv.sv_id + "' value='" + sv.diem + "' style='width:60px;'></td>" +
+                        "<td><button onclick='luuDiem(" + sv.sv_id + ", " + lopId + ")'>Lưu</button></td>" +
+                    "</tr>";
+                });
+            });
+        }
+
+        // 7. LƯU ĐIỂM
+        function luuDiem(svId, lopId) {
+            var diemMoi = document.getElementById("diem-" + svId).value;
+            if (diemMoi === "") {
+                alert("Hãy nhập điểm!");
+                return;
+            }
+
+            fetch("/api/gv-luu-diem", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sv_id: svId, lop_id: lopId, diem: diemMoi })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                alert(data.tin_nhan);
+            });
+        }
+
+        // 8. ADMIN: TẢI BẢNG VÀ THÊM/XÓA SINH VIÊN
+        function adminTaiDS() {
+            fetch("/api/admin-sinh-vien")
+            .then(function(res) { return res.json(); })
+            .then(function(danhSach) {
+                var tbody = document.getElementById("bang-admin-sv");
+                tbody.innerHTML = "";
+                danhSach.forEach(function(sv) {
+                    tbody.innerHTML += "<tr>" +
+                        "<td>" + sv.ma_sv + "</td>" +
+                        "<td>" + sv.name + "</td>" +
+                        "<td>" + sv.lop + "</td>" +
+                        "<td><button class='nut-do' onclick='adminXoaSV(" + sv.id + ")'>Xóa</button></td>" +
+                    "</tr>";
+                });
+            });
+        }
+
+        function adminThemSV() {
+            var ma = document.getElementById("admin-ma").value;
+            var ten = document.getElementById("admin-ten").value;
+            var lop = document.getElementById("admin-lop").value;
+
+            fetch("/api/admin-sinh-vien", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ma_sv: ma, name: ten, lop: lop })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                alert(data.tin_nhan);
+                adminTaiDS();
+            });
+        }
+
+        function adminXoaSV(id) {
+            if (!confirm("Bạn muốn xóa sinh viên này?")) return;
+            fetch("/api/admin-sinh-vien?id=" + id, { method: "DELETE" })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                alert(data.tin_nhan);
+                adminTaiDS();
+            });
+        }
+    </script>
+</body>
+</html>
