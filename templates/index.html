@@ -116,6 +116,55 @@
         .notice-actions .btn { min-width: 110px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+                /* NHÓM NĂM HỌC - HỌC KỲ */
+        .study-year-cell {
+            background: #faf7f0;
+            color: var(--navy);
+            font-weight: 700;
+            text-align: center;
+            vertical-align: middle;
+            border-right: 1px solid var(--line);
+        }
+
+        .study-semester-cell {
+            background: #f3eee2;
+            text-align: center;
+            vertical-align: middle;
+            border-right: 1px solid var(--line);
+        }
+
+        .study-year {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--navy);
+            white-space: nowrap;
+        }
+
+        .study-semester {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--gold-2), var(--gold));
+            color: #241c0b;
+            font-size: 0.72rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .subject-code {
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .subject-name {
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .grade-final {
+            color: var(--accent);
+            font-weight: 700;
+        }
     </style>
 </head>
 <body>
@@ -186,11 +235,14 @@
                     <table>
                         <thead>
                             <tr>
+                               <th>Năm Học</th>
+                                <th>Học Kỳ</th>
                                 <th>Mã Môn</th>
                                 <th style="text-align: left;">Tên Môn Học</th>
                                 <th>Số TC</th>
-                                <th>Quá Trình (40%)</th>
-                                <th>Cuối Kỳ (60%)</th>
+                                <th>Quá Trình</th>
+                                <th>Giữa Kỳ</th>
+                                <th>Cuối Kỳ</th>
                                 <th>Tổng Kết</th>
                                 <th>Xếp Loại</th>
                             </tr>
@@ -259,8 +311,9 @@
                                 <th style="width: 50px;">STT</th>
                                 <th style="width: 140px;">MSSV</th>
                                 <th style="text-align: left;">Họ và Tên</th>
-                                <th id="thQuaTrinh" style="width: 130px;">Quá Trình (40%)</th>
-                                <th id="thCuoiKy" style="width: 130px;">Cuối Kỳ (60%)</th>
+                                <th id="thQuaTrinh" style="width: 130px;">Quá Trình</th>
+                                <th id="thGiuaKy" style="width: 130px;">Giữa Kỳ</th>
+                                <th id="thCuoiKy" style="width: 130px;">Cuối Kỳ</th>
                                 <th style="width: 100px;">Tổng Kết</th>
                                 <th style="width: 110px;">Xếp Loại</th>
                             </tr>
@@ -455,7 +508,11 @@
         let coQuyenSua = false;
         function tyLeMonHienTai() {
             const m = subjectsList.find(x => String(x.id) === String(currentMonId));
-            return { qt: m ? m.ty_le_qt : 0.4, ck: m ? m.ty_le_ck : 0.6 };
+            return {
+                qt: m ? m.ty_le_qt : 0.3,
+                gk: m ? m.ty_le_gk : 0.2,
+                ck: m ? m.ty_le_ck : 0.5
+            };
         }
 
         function esc(s) {
@@ -659,19 +716,98 @@
 
                     const tbody = document.getElementById("bangDiemSvBody");
                     tbody.innerHTML = "";
-                    data.bang_diem.forEach(mh => {
+                    const bangDiem = data.bang_diem;
+
+                    for (let i = 0; i < bangDiem.length; i++) {
+
+                        const mh = bangDiem[i];
+
+                        const groupKey = `${mh.nam_hoc}|${mh.hoc_ky}`;
+
+                        const prevKey = i > 0
+                            ? `${bangDiem[i - 1].nam_hoc}|${bangDiem[i - 1].hoc_ky}`
+                            : null;
+
+                        const laDongDauNhom = groupKey !== prevKey;
+
+                        let rowspan = 1;
+
+                        if (laDongDauNhom) {
+                            for (let j = i + 1; j < bangDiem.length; j++) {
+
+                                const nextKey =
+                                    `${bangDiem[j].nam_hoc}|${bangDiem[j].hoc_ky}`;
+
+                                if (nextKey === groupKey) {
+                                    rowspan++;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
                         tbody.innerHTML += `
                             <tr>
-                                <td><b>${esc(mh.ma_mon)}</b></td>
-                                <td style="text-align: left;">${esc(mh.ten_mon)}</td>
-                                <td>${mh.so_tin_chi}</td>
-                                <td>${mh.diem_qt ?? "Chưa có"}</td>
-                                <td>${mh.diem_ck ?? "Chưa có"}</td>
-                                <td><strong style="color: var(--accent);">${mh.diem_tk ?? "Chưa có"}</strong></td>
-                                <td>${tinhXepLoai(mh.diem_tk)}</td>
+
+                                ${
+                                    laDongDauNhom
+                                    ? `
+                                    <td
+                                        rowspan="${rowspan}"
+                                        class="study-year-cell"
+                                    >
+                                        <div class="study-year">
+                                            ${esc(mh.nam_hoc)}
+                                        </div>
+                                    </td>
+
+                                    <td
+                                        rowspan="${rowspan}"
+                                        class="study-semester-cell"
+                                    >
+                                        <span class="study-semester">
+                                            Học kỳ ${mh.hoc_ky}
+                                        </span>
+                                    </td>
+                                    `
+                                    : ""
+                                }
+
+                                <td class="subject-code">
+                                    ${esc(mh.ma_mon)}
+                                </td>
+
+                                <td class="subject-name">
+                                    ${esc(mh.ten_mon)}
+                                </td>
+
+                                <td>
+                                    ${mh.so_tin_chi}
+                                </td>
+
+                                <td>
+                                    ${mh.diem_qt ?? "Chưa có"}
+                                </td>
+
+                                <td>
+                                    ${mh.diem_gk ?? "Chưa có"}
+                                </td>
+
+                                <td>
+                                    ${mh.diem_ck ?? "Chưa có"}
+                                </td>
+
+                                <td class="grade-final">
+                                    ${mh.diem_tk ?? "Chưa có"}
+                                </td>
+
+                                <td>
+                                    ${tinhXepLoai(mh.diem_tk)}
+                                </td>
+
                             </tr>
                         `;
-                    });
+                    }
                 });
         }
 
@@ -800,8 +936,7 @@
             const monHienTai = subjectsList.find(m => String(m.id) === String(currentMonId));
             if (monHienTai) {
                 document.getElementById("labelTenMon").textContent = `${monHienTai.ten_mon} (${monHienTai.ma_mon})`;
-                document.getElementById("thQuaTrinh").textContent = `Quá Trình (${Math.round(monHienTai.ty_le_qt * 100)}%)`;
-                document.getElementById("thCuoiKy").textContent = `Cuối Kỳ (${Math.round(monHienTai.ty_le_ck * 100)}%)`;
+            
             }
         }
 
@@ -836,6 +971,11 @@
                     </td>
                     <td>
                         <input type="number" step="0.1" min="0" max="10"
+                            class="form-control grade-input"
+                            id="gk_${sv.sv_id}"value="${sv.diem_gk ?? ""}" ${readOnlyAttr}>
+                    </td>
+                    <td>
+                        <input type="number" step="0.1" min="0" max="10"
                                class="form-control grade-input"
                                id="ck_${sv.sv_id}" value="${sv.diem_ck ?? ""}" ${readOnlyAttr}>
                     </td>
@@ -866,13 +1006,33 @@
 
         // TÍNH ĐIỂM TỔNG KẾT KHI GÕ
         document.getElementById("studentTableBody").addEventListener("input", function(e) {
-            const id = e.target.id;
-            if (!id.startsWith("qt_") && !id.startsWith("ck_")) return;
+           const id = e.target.id;
+
+            if (
+                !id.startsWith("qt_") &&
+                !id.startsWith("gk_") &&
+                !id.startsWith("ck_")
+            ) return;
+
             const svId = id.slice(3);
+
             const qt = document.getElementById(`qt_${svId}`).value;
-            const ck = document.getElementById(`ck_${svId}`).value;
+            const gk = document.getElementById(`gk_${svId}`).value;
+                        const ck = document.getElementById(`ck_${svId}`).value;
+
             const tl = tyLeMonHienTai();
-            let tk = (qt !== "" && ck !== "") ? (Number(qt) * tl.qt + Number(ck) * tl.ck).toFixed(1) : null;
+
+            let tk = (
+                qt !== "" &&
+                gk !== "" &&
+                ck !== ""
+            )
+                ? (
+                    Number(qt) * tl.qt +
+                    Number(gk) * tl.gk +
+                    Number(ck) * tl.ck
+                ).toFixed(1)
+                : null;
             document.getElementById(`tk_${svId}`).innerHTML = hienThiTongKet(tk);
             document.getElementById(`loai_${svId}`).innerHTML = tinhXepLoai(tk);
         });
@@ -896,12 +1056,16 @@
             const gradesData = [];
             for (const sv of studentsList) {
                 const elQt = document.getElementById(`qt_${sv.sv_id}`);
+                const elGk = document.getElementById(`gk_${sv.sv_id}`);
                 const elCk = document.getElementById(`ck_${sv.sv_id}`);
+
                 const qt = elQt ? elQt.value : sv.diem_qt;
+                const gk = elGk ? elGk.value : sv.diem_gk;
                 const ck = elCk ? elCk.value : sv.diem_ck;
-                gradesData.push({
+                  gradesData.push({
                     sv_id: sv.sv_id,
                     diem_qt: (qt === "" || qt === null) ? null : Number(qt),
+                    diem_gk: (gk === "" || gk === null) ? null : Number(gk),
                     diem_ck: (ck === "" || ck === null) ? null : Number(ck)
                 });
             }
