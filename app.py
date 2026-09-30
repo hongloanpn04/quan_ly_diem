@@ -17,7 +17,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 # Tăng số này mỗi khi đổi cấu trúc bảng: DB cũ sẽ được sao lưu (.bak) và nạp lại từ seed.
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 # False -> Admin/Giáo vụ (GV001-GV005) cũng chỉ thấy lớp mình được phân công; việc quản lý nằm ở menu QL Môn/QL Lớp.
 # True  -> Admin xem và sửa điểm được lớp của mọi giảng viên.
@@ -134,14 +134,16 @@ def tao_bang(conn):
             ma_mon TEXT NOT NULL UNIQUE,
             ten_mon TEXT NOT NULL,
             so_tin_chi INTEGER NOT NULL DEFAULT 3,
-            ty_le_qt REAL NOT NULL DEFAULT 0.4,
-            ty_le_gk REAL NOT NULL DEFAULT 0.0,
+            ty_le_cc REAL NOT NULL DEFAULT 0.1,
+            ty_le_bt REAL NOT NULL DEFAULT 0.1,
+            ty_le_gk REAL NOT NULL DEFAULT 0.2,
             ty_le_ck REAL NOT NULL DEFAULT 0.6,
             CHECK (so_tin_chi > 0),
-            CHECK (ty_le_qt >= 0 AND ty_le_qt <= 1),
+            CHECK (ty_le_cc >= 0 AND ty_le_cc <= 1),
+            CHECK (ty_le_bt >= 0 AND ty_le_bt <= 1),
             CHECK (ty_le_gk >= 0 AND ty_le_gk <= 1),
             CHECK (ty_le_ck >= 0 AND ty_le_ck <= 1),
-            CHECK (ABS((ty_le_qt + ty_le_gk + ty_le_ck) - 1.0) < 0.000001)
+            CHECK (ABS((ty_le_cc + ty_le_bt + ty_le_gk + ty_le_ck) - 1.0) < 0.000001)
         );
 
         CREATE TABLE IF NOT EXISTS phan_cong_giang_day (
@@ -165,14 +167,16 @@ def tao_bang(conn):
             id INTEGER PRIMARY KEY,
             sinh_vien_id INTEGER NOT NULL,
             phan_cong_id INTEGER NOT NULL,
-            diem_qua_trinh REAL,
+            diem_chuyen_can REAL,
+            diem_bai_tap REAL,
             diem_giua_ky REAL,
             diem_cuoi_ky REAL,
             diem_tong_ket REAL,
             FOREIGN KEY (sinh_vien_id) REFERENCES sinh_vien(id) ON DELETE CASCADE,
             FOREIGN KEY (phan_cong_id) REFERENCES phan_cong_giang_day(id) ON DELETE CASCADE,
             UNIQUE (sinh_vien_id, phan_cong_id),
-            CHECK (diem_qua_trinh IS NULL OR (diem_qua_trinh >= 0 AND diem_qua_trinh <= 10)),
+            CHECK (diem_chuyen_can IS NULL OR (diem_chuyen_can >= 0 AND diem_chuyen_can <= 10)),
+            CHECK (diem_bai_tap IS NULL OR (diem_bai_tap >= 0 AND diem_bai_tap <= 10)),
             CHECK (diem_giua_ky IS NULL OR (diem_giua_ky >= 0 AND diem_giua_ky <= 10)),
             CHECK (diem_cuoi_ky IS NULL OR (diem_cuoi_ky >= 0 AND diem_cuoi_ky <= 10)),
             CHECK (diem_tong_ket IS NULL OR (diem_tong_ket >= 0 AND diem_tong_ket <= 10))
@@ -222,15 +226,16 @@ def nap_seed(conn):
         )
 
     for mh in data.get("mon_hoc", []):
-        ty_le_qt = float(mh.get("ty_le_qt", 0.4))
-        ty_le_gk = float(mh.get("ty_le_gk", 0.0))
-        ty_le_ck = float(mh.get("ty_le_ck", 1 - ty_le_qt - ty_le_gk))
+        ty_le_cc = float(mh.get("ty_le_cc", 0.1))
+        ty_le_bt = float(mh.get("ty_le_bt", 0.1))
+        ty_le_gk = float(mh.get("ty_le_gk", 0.2))
+        ty_le_ck = float(mh.get("ty_le_ck", 1 - ty_le_cc - ty_le_bt - ty_le_gk))
         conn.execute(
             """INSERT OR IGNORE INTO mon_hoc
-               (id, ma_mon, ten_mon, so_tin_chi, ty_le_qt, ty_le_gk, ty_le_ck)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               (id, ma_mon, ten_mon, so_tin_chi, ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (mh["id"], mh["ma_mon"].strip().upper(), mh["ten_mon"].strip(),
-             int(mh.get("so_tin_chi", 3)), ty_le_qt, ty_le_gk, ty_le_ck)
+             int(mh.get("so_tin_chi", 3)), ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
         )
 
     for sv in data.get("sinh_vien", []):
@@ -239,7 +244,7 @@ def nap_seed(conn):
                (id, mssv, ho_ten, mail, sdt, nguoi_dung_id, lop_hoc_id)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (sv["id"], (sv.get("mssv") or sv.get("ma_sinh_vien")).strip().upper(),
-             sv["ho_ten"].strip(), sv.get("mail"), sv.get("sdt"),
+             sv["ho_ten"].strip(), sv.get("mail") or sv.get("email"), sv.get("sdt"),
              sv["nguoi_dung_id"], sv["lop_hoc_id"])
         )
 
@@ -255,17 +260,34 @@ def nap_seed(conn):
              hk, nam, trang_thai)
         )
 
+    ty_le_mon = {
+        r["id"]: r for r in conn.execute(
+            "SELECT id, ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck FROM mon_hoc")
+    }
+    mon_cua_pc = {r["id"]: r["mon_hoc_id"] for r in conn.execute("SELECT id, mon_hoc_id FROM phan_cong_giang_day")}
+
     for bd in data.get("bang_diem", []):
+        diem_cc = bd.get("diem_chuyen_can")
+        diem_bt = bd.get("diem_bai_tap")
+        diem_gk = bd.get("diem_giua_ky")
+        diem_ck = bd.get("diem_cuoi_ky")
+        diem_tk = bd.get("diem_tong_ket")
+
+        # Tính lại tổng kết theo tỷ lệ của môn để dữ liệu seed luôn khớp công thức.
+        mon = ty_le_mon.get(mon_cua_pc.get(bd["phan_cong_id"]))
+        if mon is not None:
+            tk = tinh_tong_ket(diem_cc, diem_bt, diem_gk, diem_ck,
+                               mon["ty_le_cc"], mon["ty_le_bt"], mon["ty_le_gk"], mon["ty_le_ck"])
+            if tk is not None:
+                diem_tk = tk
+
         conn.execute(
             """INSERT OR IGNORE INTO bang_diem
                (id, sinh_vien_id, phan_cong_id,
-                diem_qua_trinh, diem_giua_ky, diem_cuoi_ky, diem_tong_ket)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                diem_chuyen_can, diem_bai_tap, diem_giua_ky, diem_cuoi_ky, diem_tong_ket)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (bd["id"], bd["sinh_vien_id"], bd["phan_cong_id"],
-             bd.get("diem_qua_trinh", bd.get("diem_qt")),
-             bd.get("diem_giua_ky", bd.get("diem_gk")),
-             bd.get("diem_cuoi_ky", bd.get("diem_ck", bd.get("diem_thi"))),
-             bd.get("diem_tong_ket", bd.get("diem_tk")))
+             diem_cc, diem_bt, diem_gk, diem_ck, diem_tk)
         )
 
 
@@ -300,18 +322,118 @@ def parse_diem(value):
     return d
 
 
-def tinh_tong_ket(diem_qt, diem_gk, diem_ck, ty_le_qt=0.3, ty_le_gk=0.0, ty_le_ck=0.7):
-    if diem_qt is None or diem_ck is None:
-        return None
-    if ty_le_gk > 0 and diem_gk is None:
-        return None
-
+def tinh_tong_ket(diem_cc, diem_bt, diem_gk, diem_ck,
+                  ty_le_cc=0.1, ty_le_bt=0.1, ty_le_gk=0.2, ty_le_ck=0.6):
+    """Tổng kết = CC*tl_cc + BT*tl_bt + GK*tl_gk + CK*tl_ck.
+    Thành phần nào có tỷ lệ > 0 thì bắt buộc phải có điểm, thiếu -> chưa tính được (None)."""
+    thanh_phan = (
+        (diem_cc, ty_le_cc),
+        (diem_bt, ty_le_bt),
+        (diem_gk, ty_le_gk),
+        (diem_ck, ty_le_ck),
+    )
     tk = Decimal("0")
-    tk += Decimal(str(diem_qt)) * Decimal(str(ty_le_qt))
-    if ty_le_gk > 0:
-        tk += Decimal(str(diem_gk)) * Decimal(str(ty_le_gk))
-    tk += Decimal(str(diem_ck)) * Decimal(str(ty_le_ck))
+    for diem, ty_le in thanh_phan:
+        if ty_le > 0:
+            if diem is None:
+                return None
+            tk += Decimal(str(diem)) * Decimal(str(ty_le))
     return float(tk.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
+
+
+# ===============================
+# GPA: quy đổi thang 10 -> thang 4, xếp loại học lực
+# ===============================
+DIEM_QUY_DOI = (  # (điểm tối thiểu thang 10, điểm chữ, điểm thang 4)
+    (9.0, "A+", 4.0), (8.5, "A", 3.7), (8.0, "B+", 3.5), (7.0, "B", 3.0),
+    (6.5, "C+", 2.5), (5.5, "C", 2.0), (5.0, "D+", 1.5), (4.0, "D", 1.0),
+)
+DIEM_DAT = 4.0  # từ 4.0 trở lên là đạt môn
+
+
+def quy_doi_he4(diem10):
+    for nguong, _chu, he4 in DIEM_QUY_DOI:
+        if diem10 >= nguong:
+            return he4
+    return 0.0
+
+
+def xep_loai_hoc_luc(gpa4):
+    if gpa4 is None:
+        return None
+    for nguong, ten in ((3.6, "Xuất sắc"), (3.2, "Giỏi"), (2.5, "Khá"), (2.0, "Trung bình"), (1.0, "Yếu")):
+        if gpa4 >= nguong:
+            return ten
+    return "Kém"
+
+
+def tinh_gpa(mon_list):
+    """mon_list: [(so_tin_chi, diem_tk)]. Trả về (gpa4, gpa10, so_tc_dat) hoặc None nếu chưa có môn nào."""
+    tong_tc = sum(tc for tc, _ in mon_list)
+    if not mon_list or tong_tc <= 0:
+        return None
+    d10 = sum(tc * tk for tc, tk in mon_list) / tong_tc
+    d4 = sum(tc * quy_doi_he4(tk) for tc, tk in mon_list) / tong_tc
+    tc_dat = sum(tc for tc, tk in mon_list if tk >= DIEM_DAT)
+    return round(d4, 2), round(d10, 2), tc_dat
+
+
+def tong_hop_gpa(rows):
+    """Tổng hợp GPA từng học kỳ + tích lũy cho 1 sinh viên.
+    - Học kỳ chỉ tính khi đã HOAN_THANH và mọi môn trong kỳ đều đã có điểm tổng kết; chưa đủ thì để None.
+    - Tích lũy gồm các môn đã có điểm của những học kỳ đã hoàn thành (học lại: lấy lần học mới nhất)."""
+    nhom = {}
+    for r in rows:
+        nhom.setdefault((r["nam_hoc"], r["hoc_ky"]), []).append(r)
+
+    lan_hoc = {}  # ma_mon -> (so_tin_chi, diem_tk)
+    ket_qua = []
+
+    def goi_tich_luy():
+        g = tinh_gpa(list(lan_hoc.values())) if lan_hoc else None
+        return {
+            "gpa4": g[0] if g else None,
+            "gpa10": g[1] if g else None,
+            "tc_tich_luy": g[2] if g else None,
+            "xep_loai": xep_loai_hoc_luc(g[0]) if g else None,
+        }
+
+    for nam, hk in sorted(nhom, key=lambda k: khoa_hoc_ky(k[1], k[0])):
+        ds = nhom[(nam, hk)]
+        hoan_thanh = trang_thai_theo_thoi_gian(hk, nam) == "HOAN_THANH"
+        du_diem = all(r["diem_tk"] is not None for r in ds)
+
+        g = tinh_gpa([(r["so_tin_chi"], r["diem_tk"]) for r in ds]) if (hoan_thanh and du_diem) else None
+        if hoan_thanh:
+            for r in ds:
+                if r["diem_tk"] is not None:
+                    lan_hoc[r["ma_mon"]] = (r["so_tin_chi"], r["diem_tk"])
+
+        ket_qua.append({
+            "nam_hoc": nam,
+            "hoc_ky": hk,
+            "hoan_thanh": hoan_thanh,
+            "gpa4": g[0] if g else None,
+            "gpa10": g[1] if g else None,
+            "tc_dat": g[2] if g else None,
+            "xep_loai": xep_loai_hoc_luc(g[0]) if g else None,
+            "tich_luy": goi_tich_luy() if hoan_thanh else {
+                "gpa4": None, "gpa10": None, "tc_tich_luy": None, "xep_loai": None},
+        })
+
+    return {"hoc_ky": ket_qua, "tich_luy": goi_tich_luy()}
+
+
+def doc_ty_le(body, mac_dinh=None):
+    """Đọc 4 tỷ lệ từ request; trả về (cc, bt, gk, ck). Ném ValueError nếu không hợp lệ."""
+    mac_dinh = mac_dinh or {"ty_le_cc": 0.1, "ty_le_bt": 0.1, "ty_le_gk": 0.2}
+    cc = float(body.get("ty_le_cc", mac_dinh["ty_le_cc"]))
+    bt = float(body.get("ty_le_bt", mac_dinh["ty_le_bt"]))
+    gk = float(body.get("ty_le_gk", mac_dinh["ty_le_gk"]))
+    ck = float(body.get("ty_le_ck", 1 - cc - bt - gk))
+    if min(cc, bt, gk, ck) < 0 or max(cc, bt, gk, ck) > 1 or abs(cc + bt + gk + ck - 1) > 1e-6:
+        raise ValueError
+    return cc, bt, gk, ck
 
 
 
@@ -473,7 +595,7 @@ def api_sv_bang_diem():
 
     conn = get_db_connection()
     sv = conn.execute("""
-        SELECT sv.id, sv.mssv, sv.ho_ten, lh.ma_lop, lh.ten_lop
+        SELECT sv.id, sv.mssv, sv.ho_ten, sv.mail AS email, lh.ma_lop, lh.ten_lop
         FROM sinh_vien sv
         JOIN lop_hoc lh ON sv.lop_hoc_id = lh.id
         WHERE sv.nguoi_dung_id = ?
@@ -486,7 +608,8 @@ def api_sv_bang_diem():
     rows = conn.execute("""
         SELECT mh.ma_mon, mh.ten_mon, mh.so_tin_chi,
                pc.hoc_ky, pc.nam_hoc,
-               bd.diem_qua_trinh AS diem_qt,
+               bd.diem_chuyen_can AS diem_cc,
+               bd.diem_bai_tap AS diem_bt,
                bd.diem_giua_ky AS diem_gk,
                bd.diem_cuoi_ky AS diem_ck,
                bd.diem_tong_ket AS diem_tk
@@ -498,7 +621,12 @@ def api_sv_bang_diem():
     """, (sv["id"],)).fetchall()
 
     conn.close()
-    return jsonify({"sinh_vien": dict(sv), "bang_diem": [dict(r) for r in rows]})
+    bang_diem = [dict(r) for r in rows]
+    return jsonify({
+        "sinh_vien": dict(sv),
+        "bang_diem": bang_diem,
+        "tong_hop": tong_hop_gpa(bang_diem),
+    })
 
 
 
@@ -514,7 +642,7 @@ def api_classes():
     sql = """
         SELECT pc.id AS pc_id, lh.id AS lop_id, lh.ma_lop, lh.ten_lop,
                mh.id AS mon_hoc_id, mh.ma_mon, mh.ten_mon,
-               gv.ho_ten AS gv_phu_trach, pc.hoc_ky, pc.nam_hoc,
+               gv.ho_ten AS gv_phu_trach, gv.email AS gv_email, pc.hoc_ky, pc.nam_hoc,
                (SELECT COUNT(*) FROM sinh_vien sv WHERE sv.lop_hoc_id = lh.id) AS so_luong_sv
         FROM phan_cong_giang_day pc
         JOIN lop_hoc lh ON pc.lop_hoc_id = lh.id
@@ -585,7 +713,8 @@ def api_class_detail(ma_lop):
 
     students = conn.execute("""
         SELECT sv.id AS sv_id, sv.mssv AS mssv, sv.ho_ten,
-               bd.diem_qua_trinh AS diem_qt,
+               bd.diem_chuyen_can AS diem_cc,
+               bd.diem_bai_tap AS diem_bt,
                bd.diem_giua_ky AS diem_gk,
                bd.diem_cuoi_ky AS diem_ck,
                bd.diem_tong_ket AS diem_tk
@@ -659,11 +788,12 @@ def api_update_grades(ma_lop):
             if sv_id not in sv_hop_le:
                 raise ValueError("Sinh viên không thuộc lớp này.")
 
-            diem_qt = parse_diem(g.get("diem_qt"))
+            diem_cc = parse_diem(g.get("diem_cc"))
+            diem_bt = parse_diem(g.get("diem_bt"))
             diem_gk = parse_diem(g.get("diem_gk"))
             diem_ck = parse_diem(g.get("diem_ck", g.get("diem_thi")))
 
-            if diem_qt is None and diem_gk is None and diem_ck is None:
+            if diem_cc is None and diem_bt is None and diem_gk is None and diem_ck is None:
                 conn.execute(
                     "DELETE FROM bang_diem WHERE sinh_vien_id = ? AND phan_cong_id = ?",
                     (sv_id, pc["id"])
@@ -671,24 +801,25 @@ def api_update_grades(ma_lop):
                 continue
 
             diem_tk = tinh_tong_ket(
-                diem_qt, diem_gk, diem_ck,
-                mon["ty_le_qt"], mon["ty_le_gk"], mon["ty_le_ck"]
+                diem_cc, diem_bt, diem_gk, diem_ck,
+                mon["ty_le_cc"], mon["ty_le_bt"], mon["ty_le_gk"], mon["ty_le_ck"]
             )
 
             conn.execute("""
                 INSERT INTO bang_diem (
                     sinh_vien_id, phan_cong_id,
-                    diem_qua_trinh, diem_giua_ky,
+                    diem_chuyen_can, diem_bai_tap, diem_giua_ky,
                     diem_cuoi_ky, diem_tong_ket
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (sinh_vien_id, phan_cong_id) DO UPDATE SET
-                    diem_qua_trinh = excluded.diem_qua_trinh,
+                    diem_chuyen_can = excluded.diem_chuyen_can,
+                    diem_bai_tap = excluded.diem_bai_tap,
                     diem_giua_ky = excluded.diem_giua_ky,
                     diem_cuoi_ky = excluded.diem_cuoi_ky,
                     diem_tong_ket = excluded.diem_tong_ket
             """, (
-                sv_id, pc["id"], diem_qt, diem_gk, diem_ck, diem_tk
+                sv_id, pc["id"], diem_cc, diem_bt, diem_gk, diem_ck, diem_tk
             ))
 
         conn.commit()
@@ -730,23 +861,21 @@ def api_admin_mon_hoc():
     ten_mon = str(body.get("ten_mon", "")).strip()
     try:
         so_tc = int(body.get("so_tin_chi", 3))
-        ty_le_qt = float(body.get("ty_le_qt", 0.4))
-        ty_le_gk = float(body.get("ty_le_gk", 0.0))
-        ty_le_ck = float(body.get("ty_le_ck", 1 - ty_le_qt - ty_le_gk))
+        ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck = doc_ty_le(body)
     except (TypeError, ValueError):
         conn.close()
-        return loi("Thông tin môn học không hợp lệ.")
+        return loi("Thông tin môn học hoặc tỷ lệ điểm không hợp lệ (tổng 4 tỷ lệ phải bằng 100%).")
     if not ma_mon or not ten_mon:
         conn.close()
         return loi("Mã môn và tên môn không được rỗng.")
-    if so_tc <= 0 or min(ty_le_qt, ty_le_gk, ty_le_ck) < 0 or abs(ty_le_qt + ty_le_gk + ty_le_ck - 1) > 1e-6:
+    if so_tc <= 0:
         conn.close()
-        return loi("Số tín chỉ hoặc tỷ lệ điểm không hợp lệ.")
+        return loi("Số tín chỉ phải lớn hơn 0.")
     try:
         conn.execute("""
-            INSERT INTO mon_hoc (ma_mon, ten_mon, so_tin_chi, ty_le_qt, ty_le_gk, ty_le_ck)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (ma_mon, ten_mon, so_tc, ty_le_qt, ty_le_gk, ty_le_ck))
+            INSERT INTO mon_hoc (ma_mon, ten_mon, so_tin_chi, ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (ma_mon, ten_mon, so_tc, ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck))
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
@@ -768,27 +897,40 @@ def api_admin_mon_hoc_id(mon_id):
 
     body = request.get_json(silent=True) or {}
     ten_mon = str(body.get("ten_mon", "")).strip()
+    current = conn.execute("SELECT * FROM mon_hoc WHERE id = ?", (mon_id,)).fetchone()
+    if not current:
+        conn.close()
+        return loi("Môn học không tồn tại.", 404)
     try:
-        so_tc = int(body.get("so_tin_chi", 3))
-        ty_le_qt = float(body.get("ty_le_qt", 0.4))
-        ty_le_gk = float(body.get("ty_le_gk", 0.0))
-        ty_le_ck = float(body.get("ty_le_ck", 1 - ty_le_qt - ty_le_gk))
+        so_tc = int(body.get("so_tin_chi", current["so_tin_chi"]))
+        ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck = doc_ty_le(body, current)
     except (TypeError, ValueError):
         conn.close()
-        return loi("Thông tin môn học không hợp lệ.")
+        return loi("Thông tin môn học hoặc tỷ lệ điểm không hợp lệ (tổng 4 tỷ lệ phải bằng 100%).")
     if not ten_mon:
         conn.close()
         return loi("Tên môn không được rỗng.")
-    if so_tc <= 0 or min(ty_le_qt, ty_le_gk, ty_le_ck) < 0 or abs(ty_le_qt + ty_le_gk + ty_le_ck - 1) > 1e-6:
+    if so_tc <= 0:
         conn.close()
-        return loi("Số tín chỉ hoặc tỷ lệ điểm không hợp lệ.")
+        return loi("Số tín chỉ phải lớn hơn 0.")
 
     conn.execute("""
         UPDATE mon_hoc
         SET ten_mon = ?, so_tin_chi = ?,
-            ty_le_qt = ?, ty_le_gk = ?, ty_le_ck = ?
+            ty_le_cc = ?, ty_le_bt = ?, ty_le_gk = ?, ty_le_ck = ?
         WHERE id = ?
-    """, (ten_mon, so_tc, ty_le_qt, ty_le_gk, ty_le_ck, mon_id))
+    """, (ten_mon, so_tc, ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck, mon_id))
+
+    # Đổi tỷ lệ -> tính lại điểm tổng kết của toàn bộ bảng điểm thuộc môn này.
+    for r in conn.execute("""
+        SELECT bd.id, bd.diem_chuyen_can, bd.diem_bai_tap, bd.diem_giua_ky, bd.diem_cuoi_ky
+        FROM bang_diem bd
+        JOIN phan_cong_giang_day pc ON bd.phan_cong_id = pc.id
+        WHERE pc.mon_hoc_id = ?
+    """, (mon_id,)).fetchall():
+        tk = tinh_tong_ket(r["diem_chuyen_can"], r["diem_bai_tap"], r["diem_giua_ky"], r["diem_cuoi_ky"],
+                           ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
+        conn.execute("UPDATE bang_diem SET diem_tong_ket = ? WHERE id = ?", (tk, r["id"]))
     conn.commit()
     conn.close()
     return jsonify({"message": "Cập nhật môn học thành công!"})

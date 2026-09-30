@@ -54,6 +54,16 @@
         .container { max-width: 1200px; margin: 32px auto; padding: 0 20px; }
 
         /* CARD */
+        .gpa-box { display: grid; grid-template-columns: repeat(2, max-content); column-gap: 90px; justify-content: start; text-align: left;
+                   padding: 14px 22px; background: linear-gradient(135deg, #ebd08f, #d8b263); border-top: 1px solid #c4a04f;
+                   color: #2b1e06; font-size: .92rem; }
+        .gpa-box .gpa-col { display: grid; grid-template-columns: max-content max-content; column-gap: 12px; row-gap: 4px; align-content: start; }
+        .gpa-box .gpa-line { display: contents; }
+        .gpa-box .gpa-val { font-weight: 700; color: #1a1200; }
+        .th-pct { display: block; margin-top: 2px; font-size: .7rem; font-weight: 600; letter-spacing: .3px; color: #8a6a1f; }
+        .kq-icon { width: 22px; height: 22px; vertical-align: middle; filter: drop-shadow(0 1px 1px rgba(0,0,0,.28)); }
+        .gpa-row > td { padding: 0 !important; background: transparent !important; }
+        @media (max-width: 720px) { .gpa-box { grid-template-columns: 1fr; row-gap: 6px; } }
         .card { background: #fff; border-radius: 14px; box-shadow: 0 8px 28px rgba(15,27,45,.08); margin-bottom: 22px; border: 1px solid var(--line); overflow: hidden; }
         .card-header { padding: 14px 22px; background: linear-gradient(90deg, var(--navy), var(--navy-2)); color: #fff; font-family: var(--serif); font-size: 1.05rem; font-weight: 600; letter-spacing: .5px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--gold); }
         .card-body { padding: 22px; }
@@ -165,9 +175,18 @@
             color: var(--accent);
             font-weight: 700;
         }
+
+        /* NỀN ĐỘNG TRANG ĐĂNG NHẬP */
+        #bgCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s ease; }
+        body.login-mode #bgCanvas { opacity: 1; }
+        #bgCanvas.swap { opacity: 0 !important; }
+        body.login-mode #viewLogin { animation: loginRise .7s cubic-bezier(.2,.7,.2,1) both; }
+        body.login-mode .login-card { box-shadow: 0 24px 60px rgba(30,90,130,.22), 0 0 0 1px rgba(255,255,255,.7), 0 0 0 4px rgba(var(--login-ring, 150,205,230),.28); }
+        @keyframes loginRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
     </style>
 </head>
-<body>
+<body class="login-mode">
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
 
     <!-- NAVBAR DÙNG CHUNG -->
     <header class="navbar">
@@ -225,6 +244,7 @@
                     <h2 id="svHoTenTitle" style="color: var(--accent); margin-bottom: 6px;"></h2>
                     <p style="color: var(--muted); font-size: 0.9rem;">
                         MSSV: <strong id="svMssv"></strong> | Lớp: <span id="svLop" class="badge badge-student"></span>
+                        <span id="svEmailWrap" class="d-none"> | Email: <strong id="svEmail"></strong></span>
                     </p>
                 </div>
             </div>
@@ -240,16 +260,22 @@
                                 <th>Mã Môn</th>
                                 <th style="text-align: left;">Tên Môn Học</th>
                                 <th>Số TC</th>
-                                <th>Quá Trình</th>
+                                <th>Chuyên Cần</th>
+                                <th>Bài Tập</th>
                                 <th>Giữa Kỳ</th>
                                 <th>Cuối Kỳ</th>
                                 <th>Tổng Kết</th>
-                                <th>Xếp Loại</th>
+                                <th>Kết Quả</th>
                             </tr>
                         </thead>
                         <tbody id="bangDiemSvBody"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Kết Quả Tích Lũy Hiện Tại</div>
+                <div id="svTichLuy"></div>
             </div>
         </section>
 
@@ -311,11 +337,12 @@
                                 <th style="width: 50px;">STT</th>
                                 <th style="width: 140px;">MSSV</th>
                                 <th style="text-align: left;">Họ và Tên</th>
-                                <th id="thQuaTrinh" style="width: 130px;">Quá Trình</th>
-                                <th id="thGiuaKy" style="width: 130px;">Giữa Kỳ</th>
-                                <th id="thCuoiKy" style="width: 130px;">Cuối Kỳ</th>
+                                <th id="thChuyenCan" style="width: 110px;">Chuyên Cần</th>
+                                <th id="thBaiTap" style="width: 110px;">Bài Tập</th>
+                                <th id="thGiuaKy" style="width: 110px;">Giữa Kỳ</th>
+                                <th id="thCuoiKy" style="width: 110px;">Cuối Kỳ</th>
                                 <th style="width: 100px;">Tổng Kết</th>
-                                <th style="width: 110px;">Xếp Loại</th>
+                                <th style="width: 110px;">Kết Quả</th>
                             </tr>
                         </thead>
                         <tbody id="studentTableBody"></tbody>
@@ -341,6 +368,7 @@
                                 <th>Mã Môn</th>
                                 <th style="text-align: left;">Tên Môn Học</th>
                                 <th>Số Tín Chỉ</th>
+                                <th>Tỷ Lệ Điểm (CC / BT / GK / CK)</th>
                                 <th>Hành Động</th>
                             </tr>
                         </thead>
@@ -402,6 +430,16 @@
                     <div class="form-group">
                         <label>Số tín chỉ:</label>
                         <input type="number" id="monSoTc" class="form-control" value="3" min="1" max="10" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tỷ lệ điểm (%) &mdash; tổng phải bằng 100:</label>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                            <div><small>Chuyên cần</small><input type="number" id="monTlCc" class="form-control" value="10" min="0" max="100" step="1" required></div>
+                            <div><small>Bài tập</small><input type="number" id="monTlBt" class="form-control" value="10" min="0" max="100" step="1" required></div>
+                            <div><small>Giữa kỳ</small><input type="number" id="monTlGk" class="form-control" value="20" min="0" max="100" step="1" required></div>
+                            <div><small>Cuối kỳ</small><input type="number" id="monTlCk" class="form-control" value="60" min="0" max="100" step="1" required></div>
+                        </div>
+                        <small id="monTlTong" style="color: var(--muted);">Tổng: 100%</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -509,9 +547,10 @@
         function tyLeMonHienTai() {
             const m = subjectsList.find(x => String(x.id) === String(currentMonId));
             return {
-                qt: m ? m.ty_le_qt : 0.3,
+                cc: m ? m.ty_le_cc : 0.1,
+                bt: m ? m.ty_le_bt : 0.1,
                 gk: m ? m.ty_le_gk : 0.2,
-                ck: m ? m.ty_le_ck : 0.5
+                ck: m ? m.ty_le_ck : 0.6
             };
         }
 
@@ -540,6 +579,7 @@
                 document.getElementById(id).classList.add("d-none");
             });
             document.getElementById(viewId).classList.remove("d-none");
+            document.body.classList.toggle("login-mode", viewId === "viewLogin");
         }
 
         function hienThiHocKy(hk) {
@@ -704,6 +744,46 @@
             });
         });
 
+        // ===== GPA: hộp tổng hợp như trang cổng thông tin (để trống trường chưa tính được) =====
+        function gpaDong(nhan, giaTri) {
+            const v = (giaTri === null || giaTri === undefined) ? "" : esc(giaTri);
+            return `<div class="gpa-line"><span>- ${nhan}:</span><span class="gpa-val">${v}</span></div>`;
+        }
+
+        function hopGpaHocKy(hk) {
+            const tl = hk.tich_luy;
+            return `<div class="gpa-box">
+                <div class="gpa-col">
+                    ${gpaDong("Điểm trung bình học kỳ hệ 10", hk.gpa10)}
+                    ${gpaDong("Số tín chỉ đạt học kỳ", hk.tc_dat)}
+                    ${gpaDong("Xếp loại học kỳ", hk.xep_loai)}
+                </div>
+                <div class="gpa-col">
+                    ${gpaDong("Điểm trung bình tích lũy hệ 10", tl.gpa10)}
+                    ${gpaDong("Số tín chỉ tích lũy", tl.tc_tich_luy)}
+                    ${gpaDong("Xếp loại tích lũy", tl.xep_loai)}
+                </div>
+            </div>`;
+        }
+
+        function hopGpaTichLuy(tl) {
+            return `<div class="gpa-box">
+                <div class="gpa-col">
+                    ${gpaDong("Điểm trung bình tích lũy hệ 10", tl.gpa10)}
+                    ${gpaDong("Số tín chỉ tích lũy", tl.tc_tich_luy)}
+                </div>
+                <div class="gpa-col">
+                    ${gpaDong("Xếp loại tích lũy", tl.xep_loai)}
+                </div>
+            </div>`;
+        }
+
+        // Ô điểm của sinh viên: điểm + tỷ lệ (%) của thành phần đó trong môn
+        function oDiem(diem, tyLe) {
+            const pctTxt = (tyLe === null || tyLe === undefined) ? "" : `<span class="th-pct">${Math.round(Number(tyLe) * 100)}%</span>`;
+            return `${diem ?? "Chưa có"}${pctTxt}`;
+        }
+
         // SINH VIÊN: XEM BẢNG ĐIỂM
         function taiDiemSinhVien() {
             fetch("/api/sinh-vien/bang-diem")
@@ -713,10 +793,16 @@
                     document.getElementById("svHoTenTitle").textContent = sv.ho_ten;
                     document.getElementById("svMssv").textContent = sv.mssv;
                     document.getElementById("svLop").textContent = sv.ma_lop;
+                    document.getElementById("svEmail").textContent = sv.email || "";
+                    document.getElementById("svEmailWrap").classList.toggle("d-none", !sv.email);
 
                     const tbody = document.getElementById("bangDiemSvBody");
                     tbody.innerHTML = "";
                     const bangDiem = data.bang_diem;
+                    const tongHop = data.tong_hop || { hoc_ky: [], tich_luy: {} };
+                    const gpaTheoKy = {};
+                    tongHop.hoc_ky.forEach(h => { gpaTheoKy[`${h.nam_hoc}|${h.hoc_ky}`] = h; });
+                    document.getElementById("svTichLuy").innerHTML = hopGpaTichLuy(tongHop.tich_luy);
 
                     for (let i = 0; i < bangDiem.length; i++) {
 
@@ -786,15 +872,19 @@
                                 </td>
 
                                 <td>
-                                    ${mh.diem_qt ?? "Chưa có"}
+                                    ${oDiem(mh.diem_cc, mh.ty_le_cc)}
                                 </td>
 
                                 <td>
-                                    ${mh.diem_gk ?? "Chưa có"}
+                                    ${oDiem(mh.diem_bt, mh.ty_le_bt)}
                                 </td>
 
                                 <td>
-                                    ${mh.diem_ck ?? "Chưa có"}
+                                    ${oDiem(mh.diem_gk, mh.ty_le_gk)}
+                                </td>
+
+                                <td>
+                                    ${oDiem(mh.diem_ck, mh.ty_le_ck)}
                                 </td>
 
                                 <td class="grade-final">
@@ -802,11 +892,19 @@
                                 </td>
 
                                 <td>
-                                    ${tinhXepLoai(mh.diem_tk)}
+                                    ${ketQuaMon(mh.diem_tk)}
                                 </td>
 
                             </tr>
                         `;
+
+                        // Hết nhóm học kỳ -> chèn hộp GPA của học kỳ đó
+                        const keyTiep = i + 1 < bangDiem.length
+                            ? `${bangDiem[i + 1].nam_hoc}|${bangDiem[i + 1].hoc_ky}`
+                            : null;
+                        if (keyTiep !== groupKey && gpaTheoKy[groupKey]) {
+                            tbody.innerHTML += `<tr class="gpa-row"><td colspan="11">${hopGpaHocKy(gpaTheoKy[groupKey])}</td></tr>`;
+                        }
                     }
                 });
         }
@@ -923,6 +1021,20 @@
                 });
         }
 
+        // Hiển thị tỷ lệ (%) của môn đang chọn ngay dưới tên các cột điểm
+        function capNhatTieuDeCot(mon) {
+            const cot = [
+                ["thChuyenCan", "Chuyên Cần", "ty_le_cc"],
+                ["thBaiTap", "Bài Tập", "ty_le_bt"],
+                ["thGiuaKy", "Giữa Kỳ", "ty_le_gk"],
+                ["thCuoiKy", "Cuối Kỳ", "ty_le_ck"]
+            ];
+            cot.forEach(([id, ten, key]) => {
+                const pctTxt = mon ? `<span class="th-pct">${Math.round(Number(mon[key]) * 100)}%</span>` : "";
+                document.getElementById(id).innerHTML = ten + pctTxt;
+            });
+        }
+
         function hienThiDropdownMonHoc() {
             const select = document.getElementById("selectMonHoc");
             select.innerHTML = "";
@@ -934,6 +1046,7 @@
                 select.appendChild(opt);
             });
             const monHienTai = subjectsList.find(m => String(m.id) === String(currentMonId));
+            capNhatTieuDeCot(monHienTai);
             if (monHienTai) {
                 document.getElementById("labelTenMon").textContent = `${monHienTai.ten_mon} (${monHienTai.ma_mon})`;
             
@@ -953,7 +1066,7 @@
             document.getElementById("countHienThi").textContent = danhSach.length;
 
             if (danhSach.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="color: var(--muted); padding: 25px;">Không tìm thấy sinh viên nào phù hợp.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="color: var(--muted); padding: 25px;">Không tìm thấy sinh viên nào phù hợp.</td></tr>`;
                 return;
             }
 
@@ -967,12 +1080,17 @@
                     <td>
                         <input type="number" step="0.1" min="0" max="10"
                                class="form-control grade-input"
-                               id="qt_${sv.sv_id}" value="${sv.diem_qt ?? ""}" ${readOnlyAttr}>
+                               id="cc_${sv.sv_id}" value="${sv.diem_cc ?? ""}" ${readOnlyAttr}>
+                    </td>
+                    <td>
+                        <input type="number" step="0.1" min="0" max="10"
+                               class="form-control grade-input"
+                               id="bt_${sv.sv_id}" value="${sv.diem_bt ?? ""}" ${readOnlyAttr}>
                     </td>
                     <td>
                         <input type="number" step="0.1" min="0" max="10"
                             class="form-control grade-input"
-                            id="gk_${sv.sv_id}"value="${sv.diem_gk ?? ""}" ${readOnlyAttr}>
+                            id="gk_${sv.sv_id}" value="${sv.diem_gk ?? ""}" ${readOnlyAttr}>
                     </td>
                     <td>
                         <input type="number" step="0.1" min="0" max="10"
@@ -980,7 +1098,7 @@
                                id="ck_${sv.sv_id}" value="${sv.diem_ck ?? ""}" ${readOnlyAttr}>
                     </td>
                     <td id="tk_${sv.sv_id}">${hienThiTongKet(sv.diem_tk)}</td>
-                    <td id="loai_${sv.sv_id}">${tinhXepLoai(sv.diem_tk)}</td>
+                    <td id="loai_${sv.sv_id}">${ketQuaMon(sv.diem_tk)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1005,66 +1123,65 @@
         }
 
         // TÍNH ĐIỂM TỔNG KẾT KHI GÕ
-        document.getElementById("studentTableBody").addEventListener("input", function(e) {
-           const id = e.target.id;
+        // Thành phần nào có tỷ lệ > 0 thì bắt buộc phải có điểm mới tính được tổng kết
+        function tinhTongKet(diem, tl) {
+            let tong = 0;
+            for (const k of ["cc", "bt", "gk", "ck"]) {
+                if (tl[k] > 0) {
+                    if (diem[k] === "" || diem[k] === null || diem[k] === undefined) return null;
+                    tong += Number(diem[k]) * tl[k];
+                }
+            }
+            return (Math.round(tong * 10 + 1e-9) / 10).toFixed(1);
+        }
 
-            if (
-                !id.startsWith("qt_") &&
-                !id.startsWith("gk_") &&
-                !id.startsWith("ck_")
-            ) return;
+        document.getElementById("studentTableBody").addEventListener("input", function(e) {
+            const id = e.target.id;
+            if (!/^(cc|bt|gk|ck)_/.test(id)) return;
 
             const svId = id.slice(3);
-
-            const qt = document.getElementById(`qt_${svId}`).value;
-            const gk = document.getElementById(`gk_${svId}`).value;
-                        const ck = document.getElementById(`ck_${svId}`).value;
-
-            const tl = tyLeMonHienTai();
-
-            let tk = (
-                qt !== "" &&
-                gk !== "" &&
-                ck !== ""
-            )
-                ? (
-                    Number(qt) * tl.qt +
-                    Number(gk) * tl.gk +
-                    Number(ck) * tl.ck
-                ).toFixed(1)
-                : null;
+            const val = k => {
+                const el = document.getElementById(`${k}_${svId}`);
+                return el ? el.value : "";
+            };
+            const tk = tinhTongKet(
+                { cc: val("cc"), bt: val("bt"), gk: val("gk"), ck: val("ck") },
+                tyLeMonHienTai()
+            );
             document.getElementById(`tk_${svId}`).innerHTML = hienThiTongKet(tk);
-            document.getElementById(`loai_${svId}`).innerHTML = tinhXepLoai(tk);
+            document.getElementById(`loai_${svId}`).innerHTML = ketQuaMon(tk);
         });
 
         function hienThiTongKet(diem) {
             return (diem === null || diem === undefined) ? `<span style="color: var(--muted); font-style: italic;">Chưa có</span>` : `<strong style="color: var(--accent);">${diem}</strong>`;
         }
 
-        function tinhXepLoai(diem) {
-            if (diem === null || diem === undefined) return `<span class="badge badge-done">Chưa xét</span>`;
-            const d = Number(diem);
-            if (d >= 8.5) return `<span class="badge" style="background-color: #2f7d5b; color: #fff;">Giỏi (A)</span>`;
-            if (d >= 7.0) return `<span class="badge" style="background-color: #5aa9c9; color: #000;">Khá (B)</span>`;
-            if (d >= 5.5) return `<span class="badge" style="background-color: #d9a441; color: #000;">TB (C)</span>`;
-            if (d >= 4.0) return `<span class="badge badge-done">Yếu (D)</span>`;
-            return `<span class="badge" style="background-color: #b4443c; color: #fff;">Học Lại (F)</span>`;
+        // Kết quả môn: dấu tick xanh khi điểm tổng kết >= 4.0, dấu X đỏ khi dưới 4.0 (icon nét đậm, đầu tròn)
+        const ICON_DAT = `<svg class="kq-icon" viewBox="0 0 24 24" role="img" aria-label="Đạt"><title>Đạt</title><path d="M4.5 12.8l5 5L19.5 6.2" fill="none" stroke="#4d9a00" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const ICON_TRUOT = `<svg class="kq-icon" viewBox="0 0 24 24" role="img" aria-label="Không đạt"><title>Không đạt</title><path d="M5.5 5.5l13 13M18.5 5.5l-13 13" fill="none" stroke="#cc0000" stroke-width="4.4" stroke-linecap="round"/></svg>`;
+
+        function ketQuaMon(diem) {
+            if (diem === null || diem === undefined || diem === "") return `<span class="badge badge-done">Chưa xét</span>`;
+            return Number(diem) >= 4 ? ICON_DAT : ICON_TRUOT;
         }
 
         function luuDiem() {
             if (!coQuyenSua) { thongBao("Lớp học phần đã kết thúc, bạn không có quyền sửa điểm."); return; }
             const gradesData = [];
             for (const sv of studentsList) {
-                const elQt = document.getElementById(`qt_${sv.sv_id}`);
+                const elCc = document.getElementById(`cc_${sv.sv_id}`);
+                const elBt = document.getElementById(`bt_${sv.sv_id}`);
                 const elGk = document.getElementById(`gk_${sv.sv_id}`);
                 const elCk = document.getElementById(`ck_${sv.sv_id}`);
 
-                const qt = elQt ? elQt.value : sv.diem_qt;
+                const cc = elCc ? elCc.value : sv.diem_cc;
+                const bt = elBt ? elBt.value : sv.diem_bt;
                 const gk = elGk ? elGk.value : sv.diem_gk;
                 const ck = elCk ? elCk.value : sv.diem_ck;
-                  gradesData.push({
+                gradesData.push({
                     sv_id: sv.sv_id,
-                    diem_qt: (qt === "" || qt === null) ? null : Number(qt),
+                    diem_cc: (cc === "" || cc === null || cc === undefined) ? null : Number(cc),
+                    diem_bt: (bt === "" || bt === null || bt === undefined) ? null : Number(bt),
                     diem_gk: (gk === "" || gk === null) ? null : Number(gk),
                     diem_ck: (ck === "" || ck === null) ? null : Number(ck)
                 });
@@ -1092,14 +1209,34 @@
                                 <td><strong>${esc(m.ma_mon)}</strong></td>
                                 <td style="text-align: left;">${esc(m.ten_mon)}</td>
                                 <td>${m.so_tin_chi}</td>
+                                <td>${pct(m.ty_le_cc)} / ${pct(m.ty_le_bt)} / ${pct(m.ty_le_gk)} / ${pct(m.ty_le_ck)}</td>
                                 <td>
-                                    <button class="btn btn-outline-primary btn-sm" onclick="moModalSuaMon(${m.id}, '${esc(m.ma_mon)}', '${esc(m.ten_mon)}', ${m.so_tin_chi})">Sửa</button>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="moModalSuaMon(${m.id}, '${esc(m.ma_mon)}', '${esc(m.ten_mon)}', ${m.so_tin_chi}, ${m.ty_le_cc}, ${m.ty_le_bt}, ${m.ty_le_gk}, ${m.ty_le_ck})">Sửa</button>
                                     <button class="btn btn-outline-danger btn-sm" onclick="xoaMonHoc(${m.id})">Xóa</button>
                                 </td>
                             </tr>
                         `;
                     });
                 });
+        }
+
+        const pct = v => Math.round(Number(v) * 100) + "%";
+        const TL_IDS = ["monTlCc", "monTlBt", "monTlGk", "monTlCk"];
+
+        function capNhatTongTyLe() {
+            const tong = TL_IDS.reduce((s, id) => s + (Number(document.getElementById(id).value) || 0), 0);
+            const el = document.getElementById("monTlTong");
+            el.textContent = `Tổng: ${tong}%` + (tong === 100 ? "" : " (phải bằng 100%)");
+            el.style.color = tong === 100 ? "var(--muted)" : "#b4443c";
+            return tong;
+        }
+        TL_IDS.forEach(id => document.getElementById(id).addEventListener("input", capNhatTongTyLe));
+
+        function datTyLeModal(cc, bt, gk, ck) {
+            [cc, bt, gk, ck].forEach((v, i) => {
+                document.getElementById(TL_IDS[i]).value = Math.round(Number(v) * 100);
+            });
+            capNhatTongTyLe();
         }
 
         function moModalThemMon() {
@@ -1109,21 +1246,27 @@
             document.getElementById("monMa").removeAttribute("readonly");
             document.getElementById("monTen").value = "";
             document.getElementById("monSoTc").value = 3;
+            datTyLeModal(0.1, 0.1, 0.2, 0.6);
             moModal("modalMonHoc");
         }
 
-        function moModalSuaMon(id, ma, ten, tc) {
+        function moModalSuaMon(id, ma, ten, tc, cc, bt, gk, ck) {
             document.getElementById("modalMonTitle").textContent = "Cập Nhật Môn Học";
             document.getElementById("monId").value = id;
             document.getElementById("monMa").value = ma;
             document.getElementById("monMa").setAttribute("readonly", true);
             document.getElementById("monTen").value = ten;
             document.getElementById("monSoTc").value = tc;
+            datTyLeModal(cc, bt, gk, ck);
             moModal("modalMonHoc");
         }
 
         document.getElementById("formMonHoc").addEventListener("submit", function(e) {
             e.preventDefault();
+            if (capNhatTongTyLe() !== 100) {
+                thongBao("Tổng các tỷ lệ điểm phải bằng 100%.");
+                return;
+            }
             const id = document.getElementById("monId").value;
             const method = id ? "PUT" : "POST";
             const url = id ? `/api/admin/mon-hoc/${id}` : "/api/admin/mon-hoc";
@@ -1134,7 +1277,11 @@
                 body: JSON.stringify({
                     ma_mon: document.getElementById("monMa").value.trim(),
                     ten_mon: document.getElementById("monTen").value.trim(),
-                    so_tin_chi: Number(document.getElementById("monSoTc").value)
+                    so_tin_chi: Number(document.getElementById("monSoTc").value),
+                    ty_le_cc: Number(document.getElementById("monTlCc").value) / 100,
+                    ty_le_bt: Number(document.getElementById("monTlBt").value) / 100,
+                    ty_le_gk: Number(document.getElementById("monTlGk").value) / 100,
+                    ty_le_ck: Number(document.getElementById("monTlCk").value) / 100
                 })
             })
             .then(res => res.json())
@@ -1170,7 +1317,7 @@
         function locQuanLyLop() {
             const q = document.getElementById("searchQuanLyLop").value.trim().toLowerCase();
             hienThiQuanLyLop(dsQuanLyLop.filter(c =>
-                [c.ma_lop, c.ma_mon, c.ten_mon, c.gv_phu_trach].some(v => String(v || "").toLowerCase().includes(q))));
+                [c.ma_lop, c.ma_mon, c.ten_mon, c.gv_phu_trach, c.gv_email].some(v => String(v || "").toLowerCase().includes(q))));
         }
 
         function hienThiQuanLyLop(list) {
@@ -1185,7 +1332,10 @@
                 tr.innerHTML = `
                     <td><strong>${esc(c.ma_lop)}</strong></td>
                     <td style="text-align: left;">${esc(c.ten_mon)} (${esc(c.ma_mon)})</td>
-                    <td style="text-align: left;">${esc(c.gv_phu_trach)}</td>
+                    <td style="text-align: left;">
+                        ${esc(c.gv_phu_trach)}
+                        ${c.gv_email ? `<div style="font-size: 0.85em; color: var(--muted); margin-top: 2px; word-break: break-all;">${esc(c.gv_email)}</div>` : ""}
+                    </td>
                     <td>HK${c.hoc_ky} • ${esc(c.nam_hoc)}</td>
                     <td>${badgeTrangThai(c.trang_thai)}</td>
                     <td>${c.so_luong_sv} sinh viên</td>
@@ -1197,6 +1347,257 @@
                 tbody.appendChild(tr);
             });
         }
+
+        // ================= NỀN ĐỘNG TRANG ĐĂNG NHẬP (tuyết / hoa anh đào / lá thu) =================
+        (function () {
+            const cv = document.getElementById("bgCanvas");
+            if (!cv) return;
+            const ctx = cv.getContext("2d");
+            const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+            const THEMES = {
+                snow: {
+                    sky: ["#8fd2f3", "#bfe7fa", "#e5f5fd"],
+                    glows: [["255,255,255", .70], ["150,215,240", .45], ["190,230,246", .40]],
+                    hillBack: ["rgba(255,255,255,.55)", "rgba(209, 238, 253, 0.85)"],
+                    hillFront: ["rgba(255,255,255,.92)", "rgb(217, 237, 247)"],
+                    ring: "150,205,230"
+                },
+                sakura: {
+                    sky: ["#fdacc8", "#fcdbe6", "#f6b8ce"],
+                    glows: [["255,255,255", .70], ["255,180,205", .40], ["255,215,225", .40]],
+                    hillBack: ["rgba(255,255,255,.50)", "rgba(247, 205, 219, 0.85)"],
+                    hillFront: ["rgba(255,255,255,.90)", "rgba(255,244,248,1)"],
+                    colors: ["#f9b4c9", "#f7a1bb", "#fcd0dd", "#ffffff", "#f48fb1"],
+                    ring: "245,170,195"
+                },
+                autumn: {
+                    sky: ["#f6d5a4", "#fae6c6", "#fff6e8"],
+                    glows: [["255,255,255", .60], ["255,190,110", .40], ["255,220,160", .40]],
+                    hillBack: ["rgba(255,255,255,.45)", "rgba(250,230,200,.85)"],
+                    hillFront: ["rgba(255,250,240,.90)", "rgba(255,246,232,1)"],
+                    colors: ["#d9822b", "#c1502e", "#e8a33d", "#a63d2a", "#f0b95a"],
+                    ring: "235,180,110"
+                }
+            };
+
+            const ORDER = ["snow", "sakura", "autumn"];   // thứ tự các nền thay phiên nhau
+            const DOI_NEN_MS = 4000;                       // mỗi nền hiện 4 giây rồi tự đổi
+            let themeName = ORDER[0];
+            let TH = THEMES[themeName];
+
+            let W, H, raf = null, t = 0, parts = [], crystals = [], sparkles = [], glows = [];
+            const mouse = { x: -9999, y: -9999 };
+
+            // Hạt tuyết mềm vẽ sẵn 1 lần
+            const sprite = document.createElement("canvas");
+            sprite.width = sprite.height = 64;
+            (function () {
+                const c = sprite.getContext("2d");
+                const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+                g.addColorStop(0, "rgba(255,255,255,1)");
+                g.addColorStop(.45, "rgba(255,255,255,.85)");
+                g.addColorStop(1, "rgba(255,255,255,0)");
+                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+            })();
+
+            function init() {
+                const snow = themeName === "snow";
+                const n = snow ? Math.round(Math.min(240, Math.max(60, W * H / 8500)))
+                               : Math.round(Math.min(90, Math.max(24, W * H / 22000)));
+                parts = Array.from({ length: n }, () => {
+                    const z = Math.random();
+                    const p = { x: Math.random() * W, y: Math.random() * H, z,
+                                ph: Math.random() * 6.28, sw: .4 + Math.random() * .8 };
+                    if (snow) { p.r = 1.2 + z * 3.4; p.vy = .25 + z * 1.05; }
+                    else {
+                        p.r = themeName === "sakura" ? 5 + z * 7 : 7 + z * 9;
+                        p.vy = (themeName === "sakura" ? .35 : .55) + z * .8;
+                        p.rot = Math.random() * 6.28;
+                        p.vr = (Math.random() - .5) * (themeName === "sakura" ? .03 : .045);
+                        p.col = TH.colors[Math.floor(Math.random() * TH.colors.length)];
+                    }
+                    return p;
+                }).sort((a, b) => a.z - b.z);
+
+                crystals = snow ? Array.from({ length: Math.round(Math.min(22, Math.max(8, W / 85))) }, () => ({
+                    x: Math.random() * W, y: Math.random() * H,
+                    r: 8 + Math.random() * 14, vy: .28 + Math.random() * .45,
+                    rot: Math.random() * 6.28, vr: (Math.random() - .5) * .012,
+                    ph: Math.random() * 6.28, a: .55 + Math.random() * .4
+                })) : [];
+
+                sparkles = Array.from({ length: 14 }, () => ({
+                    x: Math.random() * W, y: Math.random() * H * .7,
+                    s: 3 + Math.random() * 5, ph: Math.random() * 6.28, sp: .02 + Math.random() * .03
+                }));
+                glows = TH.glows.map((g, i) => ({
+                    x: [.18, .86, .55][i], y: [.18, .12, .55][i], r: [.42, .38, .50][i],
+                    c: g[0], a: g[1], s: [.0009, .0007, .0006][i], p: [0, 2.0, 4.1][i]
+                }));
+            }
+
+            function resize() {
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                W = window.innerWidth; H = window.innerHeight;
+                cv.width = W * dpr; cv.height = H * dpr;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                init();
+                if (!raf) draw();
+            }
+
+            function hill(base, amp, f1, f2, ph, top, bottom) {
+                ctx.beginPath(); ctx.moveTo(0, H);
+                for (let x = 0; x <= W; x += 12)
+                    ctx.lineTo(x, base + Math.sin(x * f1 + ph) * amp + Math.sin(x * f2 + ph * 1.7) * amp * .45);
+                ctx.lineTo(W, H); ctx.closePath();
+                const g = ctx.createLinearGradient(0, base - amp, 0, H);
+                g.addColorStop(0, top); g.addColorStop(1, bottom);
+                ctx.fillStyle = g; ctx.fill();
+            }
+
+            function crystal(c) {
+                ctx.save();
+                ctx.translate(c.x, c.y); ctx.rotate(c.rot);
+                ctx.globalAlpha = c.a;
+                ctx.strokeStyle = "rgba(255,255,255,.98)";
+                ctx.shadowColor = "rgba(70,150,195,.55)"; ctx.shadowBlur = 5;
+                ctx.lineWidth = 1.5; ctx.lineCap = "round";
+                for (let i = 0; i < 6; i++) {
+                    ctx.rotate(Math.PI / 3);
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -c.r);
+                    ctx.moveTo(0, -c.r * .55); ctx.lineTo(c.r * .28, -c.r * .8);
+                    ctx.moveTo(0, -c.r * .55); ctx.lineTo(-c.r * .28, -c.r * .8);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            function petal(p) {
+                const r = p.r, flip = Math.abs(Math.cos(t * .03 * p.sw + p.ph)) * .85 + .15;
+                ctx.save();
+                ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(flip, 1);
+                ctx.globalAlpha = .55 + p.z * .4;
+                ctx.fillStyle = p.col;
+                ctx.beginPath();
+                ctx.moveTo(0, -r);
+                ctx.bezierCurveTo(r * .95, -r * .65, r * .8, r * .55, 0, r);
+                ctx.bezierCurveTo(-r * .8, r * .55, -r * .95, -r * .65, 0, -r);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(0, -r * .6); ctx.lineTo(0, r * .7); ctx.stroke();
+                ctx.restore();
+            }
+
+            function leaf(p) {
+                const r = p.r, flip = Math.abs(Math.cos(t * .025 * p.sw + p.ph)) * .7 + .3;
+                ctx.save();
+                ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(flip, 1);
+                ctx.globalAlpha = .6 + p.z * .38;
+                ctx.fillStyle = p.col;
+                ctx.beginPath();
+                ctx.moveTo(0, -r);
+                ctx.quadraticCurveTo(r * .95, -r * .1, 0, r);
+                ctx.quadraticCurveTo(-r * .95, -r * .1, 0, -r);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(90,40,10,.45)"; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r * 1.25); ctx.stroke();
+                ctx.restore();
+            }
+
+            function draw() {
+                const bg = ctx.createLinearGradient(0, 0, 0, H);
+                bg.addColorStop(0, TH.sky[0]); bg.addColorStop(.5, TH.sky[1]); bg.addColorStop(1, TH.sky[2]);
+                ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+                const big = Math.max(W, H);
+                glows.forEach(b => {
+                    const cx = (b.x + Math.sin(t * b.s + b.p) * .08) * W;
+                    const cy = (b.y + Math.cos(t * b.s * .8 + b.p) * .06) * H;
+                    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, b.r * big);
+                    g.addColorStop(0, `rgba(${b.c},${b.a})`); g.addColorStop(1, `rgba(${b.c},0)`);
+                    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                });
+
+                sparkles.forEach(sp => {
+                    const a = Math.max(0, Math.sin(t * sp.sp + sp.ph));
+                    if (a < .05) return;
+                    ctx.save();
+                    ctx.translate(sp.x, sp.y); ctx.globalAlpha = a * .9; ctx.fillStyle = "#fff";
+                    ctx.beginPath();
+                    ctx.moveTo(0, -sp.s * 2); ctx.lineTo(sp.s * .35, -sp.s * .35); ctx.lineTo(sp.s * 2, 0);
+                    ctx.lineTo(sp.s * .35, sp.s * .35); ctx.lineTo(0, sp.s * 2); ctx.lineTo(-sp.s * .35, sp.s * .35);
+                    ctx.lineTo(-sp.s * 2, 0); ctx.lineTo(-sp.s * .35, -sp.s * .35);
+                    ctx.closePath(); ctx.fill();
+                    ctx.restore();
+                });
+
+                hill(H * .80, H * .05, .004, .011, 1.2, TH.hillBack[0], TH.hillBack[1]);
+                hill(H * .90, H * .04, .006, .015, 3.4, TH.hillFront[0], TH.hillFront[1]);
+
+                const wind = Math.sin(t * .004) * .45 + .12;
+
+                for (const p of parts) {
+                    if (!reduce) {
+                        p.y += p.vy;
+                        p.x += wind * (.3 + p.z) + Math.sin(t * .02 * p.sw + p.ph) * .35 * (.4 + p.z);
+                        if (p.rot !== undefined) p.rot += p.vr;
+                        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+                        if (d < 90 && d > 0) { p.x += (dx / d) * 1.4; p.y += (dy / d) * .6; }
+                        if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
+                        if (p.x > W + 20) p.x = -20; else if (p.x < -20) p.x = W + 20;
+                    }
+                    if (themeName === "snow") {
+                        ctx.globalAlpha = .45 + p.z * .5;
+                        const size = p.r * 3;
+                        ctx.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
+                    } else if (themeName === "sakura") petal(p);
+                    else leaf(p);
+                }
+                ctx.globalAlpha = 1;
+
+                for (const c of crystals) {
+                    if (!reduce) {
+                        c.y += c.vy; c.rot += c.vr;
+                        c.x += wind * .6 + Math.sin(t * .015 + c.ph) * .4;
+                        if (c.y > H + 30) { c.y = -30; c.x = Math.random() * W; }
+                        if (c.x > W + 30) c.x = -30; else if (c.x < -30) c.x = W + 30;
+                    }
+                    crystal(c);
+                }
+            }
+
+            function loop() { t++; draw(); raf = requestAnimationFrame(loop); }
+            function start() { if (reduce) { draw(); } else if (!raf) { raf = requestAnimationFrame(loop); } }
+            function stop() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+            function sync() { document.body.classList.contains("login-mode") && !document.hidden ? start() : stop(); }
+
+            function setTheme(name) {
+                if (!THEMES[name]) return;
+                themeName = name; TH = THEMES[name];
+                document.body.style.setProperty("--login-ring", TH.ring);
+                init();
+                if (!raf) draw();
+            }
+
+            // Tự động đổi nền: mờ dần -> đổi chủ đề -> hiện lại
+            setInterval(() => {
+                if (!document.body.classList.contains("login-mode") || document.hidden) return;
+                cv.classList.add("swap");
+                setTimeout(() => {
+                    setTheme(ORDER[(ORDER.indexOf(themeName) + 1) % ORDER.length]);
+                    cv.classList.remove("swap");
+                }, 900);
+            }, DOI_NEN_MS);
+            window.addEventListener("resize", resize);
+            window.addEventListener("mousemove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+            window.addEventListener("mouseleave", () => { mouse.x = mouse.y = -9999; });
+            document.addEventListener("visibilitychange", sync);
+            new MutationObserver(sync).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+            resize();
+            setTheme(themeName);
+            sync();
+        })();
     </script>
 </body>
 </html>
