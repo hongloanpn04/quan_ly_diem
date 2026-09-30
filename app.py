@@ -380,8 +380,9 @@ def tinh_gpa(mon_list):
 
 def tong_hop_gpa(rows):
     """Tổng hợp GPA từng học kỳ + tích lũy cho 1 sinh viên.
-    - Học kỳ chỉ tính khi đã HOAN_THANH và mọi môn trong kỳ đều đã có điểm tổng kết; chưa đủ thì để None.
-    - Tích lũy gồm các môn đã có điểm của những học kỳ đã hoàn thành (học lại: lấy lần học mới nhất)."""
+    - Học kỳ tính ngay trên các môn đã có điểm tổng kết (dù mới có 1 môn, dù kỳ chưa kết thúc);
+      chưa có môn nào có điểm tổng kết thì để None.
+    - Tích lũy gồm mọi môn đã có điểm tổng kết tính đến học kỳ đó (học lại: lấy lần học mới nhất)."""
     nhom = {}
     for r in rows:
         nhom.setdefault((r["nam_hoc"], r["hoc_ky"]), []).append(r)
@@ -401,13 +402,11 @@ def tong_hop_gpa(rows):
     for nam, hk in sorted(nhom, key=lambda k: khoa_hoc_ky(k[1], k[0])):
         ds = nhom[(nam, hk)]
         hoan_thanh = trang_thai_theo_thoi_gian(hk, nam) == "HOAN_THANH"
-        du_diem = all(r["diem_tk"] is not None for r in ds)
+        co_diem = [r for r in ds if r["diem_tk"] is not None]
 
-        g = tinh_gpa([(r["so_tin_chi"], r["diem_tk"]) for r in ds]) if (hoan_thanh and du_diem) else None
-        if hoan_thanh:
-            for r in ds:
-                if r["diem_tk"] is not None:
-                    lan_hoc[r["ma_mon"]] = (r["so_tin_chi"], r["diem_tk"])
+        g = tinh_gpa([(r["so_tin_chi"], r["diem_tk"]) for r in co_diem]) if co_diem else None
+        for r in co_diem:
+            lan_hoc[r["ma_mon"]] = (r["so_tin_chi"], r["diem_tk"])
 
         ket_qua.append({
             "nam_hoc": nam,
@@ -417,8 +416,7 @@ def tong_hop_gpa(rows):
             "gpa10": g[1] if g else None,
             "tc_dat": g[2] if g else None,
             "xep_loai": xep_loai_hoc_luc(g[0]) if g else None,
-            "tich_luy": goi_tich_luy() if hoan_thanh else {
-                "gpa4": None, "gpa10": None, "tc_tich_luy": None, "xep_loai": None},
+            "tich_luy": goi_tich_luy(),
         })
 
     return {"hoc_ky": ket_qua, "tich_luy": goi_tich_luy()}

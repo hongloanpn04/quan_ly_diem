@@ -155,7 +155,7 @@
   "phan_cong_giang_day": [
     {"id": 1, "giang_vien_id": 1, "mon_hoc_id": 1, "lop_hoc_id": 1, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
     {"id": 2, "giang_vien_id": 1, "mon_hoc_id": 2, "lop_hoc_id": 1, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
-    {"id": 3, "giang_vien_id": 1, "mon_hoc_id": 5, "lop_hoc_id": 11, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
+    {"id": 3, "giang_vien_id": 19, "mon_hoc_id": 5, "lop_hoc_id": 1, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
     {"id": 4, "giang_vien_id": 2, "mon_hoc_id": 1, "lop_hoc_id": 2, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
     {"id": 5, "giang_vien_id": 2, "mon_hoc_id": 3, "lop_hoc_id": 12, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
     {"id": 6, "giang_vien_id": 3, "mon_hoc_id": 3, "lop_hoc_id": 3, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
@@ -167,7 +167,7 @@
     {"id": 12, "giang_vien_id": 6, "mon_hoc_id": 2, "lop_hoc_id": 6, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
     {"id": 13, "giang_vien_id": 6, "mon_hoc_id": 10, "lop_hoc_id": 15, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
     {"id": 14, "giang_vien_id": 7, "mon_hoc_id": 3, "lop_hoc_id": 7, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
-    {"id": 15, "giang_vien_id": 7, "mon_hoc_id": 5, "lop_hoc_id": 11, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
+    {"id": 15, "giang_vien_id": 1, "mon_hoc_id": 5, "lop_hoc_id": 11, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
     {"id": 16, "giang_vien_id": 8, "mon_hoc_id": 4, "lop_hoc_id": 8, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
     {"id": 17, "giang_vien_id": 8, "mon_hoc_id": 6, "lop_hoc_id": 12, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
     {"id": 18, "giang_vien_id": 9, "mon_hoc_id": 1, "lop_hoc_id": 9, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
@@ -193,7 +193,8 @@
     {"id": 38, "giang_vien_id": 19, "mon_hoc_id": 3, "lop_hoc_id": 9, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
     {"id": 39, "giang_vien_id": 19, "mon_hoc_id": 5, "lop_hoc_id": 13, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
     {"id": 40, "giang_vien_id": 20, "mon_hoc_id": 4, "lop_hoc_id": 10, "hoc_ky": 2, "nam_hoc": "2025-2026", "trang_thai": "HOAN_THANH"},
-    {"id": 41, "giang_vien_id": 20, "mon_hoc_id": 6, "lop_hoc_id": 14, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"}
+    {"id": 41, "giang_vien_id": 20, "mon_hoc_id": 6, "lop_hoc_id": 14, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"},
+    {"id": 42, "giang_vien_id": 20, "mon_hoc_id": 4, "lop_hoc_id": 1, "hoc_ky": 1, "nam_hoc": "2026-2027", "trang_thai": "DANG_DAY"}
   ],
   "sinh_vien": [
     {"id": 1, "mssv": "N23DCCN001", "ho_ten": "Nguyễn Văn An", "lop_hoc_id": 1, "nguoi_dung_id": 21, "sdt": "0902000001", "email": "n23dccn001@ptit.edu.vn"},
@@ -400,4 +401,3 @@
     {"id": 105, "sinh_vien_id": 65, "phan_cong_id": 40, "diem_chuyen_can": 8.5, "diem_bai_tap": 7.5, "diem_giua_ky": 8.0, "diem_cuoi_ky": 8.0}
   ]
 }
-2
