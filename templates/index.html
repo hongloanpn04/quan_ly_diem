@@ -179,7 +179,7 @@
         /* NỀN ĐỘNG TRANG ĐĂNG NHẬP */
         #bgCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s ease; }
         body.login-mode #bgCanvas { opacity: 1; }
-        #bgCanvas.swap { opacity: 0 !important; }
+        .bg-ghost { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 1; transition: opacity 1.1s ease-in-out; }
         body.login-mode #viewLogin { animation: loginRise .7s cubic-bezier(.2,.7,.2,1) both; }
         body.login-mode .login-card { box-shadow: 0 24px 60px rgba(30,90,130,.22), 0 0 0 1px rgba(255,255,255,.7), 0 0 0 4px rgba(var(--login-ring, 150,205,230),.28); }
         @keyframes loginRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
@@ -1382,7 +1382,7 @@
             };
 
             const ORDER = ["snow", "sakura", "autumn"];   // thứ tự các nền thay phiên nhau
-            const DOI_NEN_MS = 4000;                       // mỗi nền hiện 4 giây rồi tự đổi
+            const DOI_NEN_MS = 5000;                       // mỗi nền hiện 5 giây rồi tự đổi
             let themeName = ORDER[0];
             let TH = THEMES[themeName];
 
@@ -1583,11 +1583,16 @@
             // Tự động đổi nền: mờ dần -> đổi chủ đề -> hiện lại
             setInterval(() => {
                 if (!document.body.classList.contains("login-mode") || document.hidden) return;
-                cv.classList.add("swap");
-                setTimeout(() => {
-                    setTheme(ORDER[(ORDER.indexOf(themeName) + 1) % ORDER.length]);
-                    cv.classList.remove("swap");
-                }, 900);
+                // Chụp nền cũ đặt chồng lên, đổi ngay sang nền mới bên dưới rồi làm mờ dần bản chụp -> không có khoảng trắng
+                const ghost = document.createElement("canvas");
+                ghost.width = cv.width; ghost.height = cv.height;
+                ghost.className = "bg-ghost";
+                ghost.getContext("2d").drawImage(cv, 0, 0);
+                cv.after(ghost);
+                setTheme(ORDER[(ORDER.indexOf(themeName) + 1) % ORDER.length]);
+                void ghost.offsetWidth;
+                ghost.style.opacity = "0";
+                setTimeout(() => ghost.remove(), 1200);
             }, DOI_NEN_MS);
             window.addEventListener("resize", resize);
             window.addEventListener("mousemove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
