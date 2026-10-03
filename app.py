@@ -17,7 +17,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 # Tăng số này mỗi khi đổi cấu trúc bảng: DB cũ sẽ được sao lưu (.bak) và nạp lại từ seed.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 # False -> Admin/Giáo vụ (GV001-GV005) cũng chỉ thấy lớp mình được phân công; việc quản lý nằm ở menu QL Môn/QL Lớp.
 # True  -> Admin xem và sửa điểm được lớp của mọi giảng viên.
@@ -276,8 +276,8 @@ def nap_seed(conn):
         # Tính lại tổng kết theo tỷ lệ của môn để dữ liệu seed luôn khớp công thức.
         mon = ty_le_mon.get(mon_cua_pc.get(bd["phan_cong_id"]))
         if mon is not None:
-            tk = tinh_tong_ket(diem_cc, diem_bt, diem_gk, diem_ck,
-                               mon["ty_le_cc"], mon["ty_le_bt"], mon["ty_le_gk"], mon["ty_le_ck"])
+            diem_ck, tk, _, _ = chuan_hoa_diem(diem_cc, diem_bt, diem_gk, diem_ck,
+                                               mon["ty_le_cc"], mon["ty_le_bt"], mon["ty_le_gk"], mon["ty_le_ck"])
             if tk is not None:
                 diem_tk = tk
 
@@ -341,21 +341,57 @@ def tinh_tong_ket(diem_cc, diem_bt, diem_gk, diem_ck,
     return float(tk.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
+def danh_gia_diem(diem_cc, diem_bt, diem_gk, diem_ck,
+                  ty_le_cc=0.1, ty_le_bt=0.1, ty_le_gk=0.2, ty_le_ck=0.6):
+    """Trả về (cam_thi, rot).
+    - cam_thi: một trong các cột CC/BT/GK (tỷ lệ > 0) bằng 0 -> không được thi (nhập điểm) cuối kỳ.
+    - rot: cấm thi, hoặc điểm cuối kỳ bằng 0 -> môn KHÔNG ĐẠT (dấu X) dù tổng kết là bao nhiêu."""
+    cam_thi = any(
+        d is not None and float(d) == 0 and tl > 0
+        for d, tl in ((diem_cc, ty_le_cc), (diem_bt, ty_le_bt), (diem_gk, ty_le_gk))
+    )
+    ck_bang_0 = diem_ck is not None and float(diem_ck) == 0 and ty_le_ck > 0
+    return cam_thi, (cam_thi or ck_bang_0)
+
+
+def chuan_hoa_diem(diem_cc, diem_bt, diem_gk, diem_ck,
+                   ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck):
+    """Áp quy tắc cấm thi. Trả về (diem_ck_luu, diem_tong_ket, cam_thi, rot).
+    Cấm thi: không lưu điểm cuối kỳ (NULL), tổng kết tính với cuối kỳ = 0."""
+    cam_thi, rot = danh_gia_diem(diem_cc, diem_bt, diem_gk, diem_ck,
+                                 ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
+    if cam_thi:
+        diem_ck = None
+    tk = tinh_tong_ket(diem_cc, diem_bt, diem_gk, 0.0 if cam_thi else diem_ck,
+                       ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
+    return diem_ck, tk, cam_thi, rot
+
+
 # ===============================
 # GPA: quy đổi thang 10 -> thang 4, xếp loại học lực
 # ===============================
-DIEM_QUY_DOI = (  # (điểm tối thiểu thang 10, điểm chữ, điểm thang 4)
+DIEM_QUY_DOI = (  
     (9.0, "A+", 4.0), (8.5, "A", 3.7), (8.0, "B+", 3.5), (7.0, "B", 3.0),
     (6.5, "C+", 2.5), (5.5, "C", 2.0), (5.0, "D+", 1.5), (4.0, "D", 1.0),
-)
+)  # dưới 4.0 -> F (0.0, không đạt)
 DIEM_DAT = 4.0  # từ 4.0 trở lên là đạt môn
 
 
-def quy_doi_he4(diem10):
-    for nguong, _chu, he4 in DIEM_QUY_DOI:
+def quy_doi_diem(diem10, rot=False):
+    """Trả về (điểm chữ, điểm hệ 4). Môn rớt (cấm thi / cuối kỳ bằng 0) luôn là F - 0.0.
+    Chưa có điểm tổng kết và chưa rớt -> (None, None)."""
+    if rot:
+        return "F", 0.0
+    if diem10 is None:
+        return None, None
+    for nguong, chu, he4 in DIEM_QUY_DOI:
         if diem10 >= nguong:
-            return he4
-    return 0.0
+            return chu, he4
+    return "F", 0.0
+
+
+def quy_doi_he4(diem10):
+    return quy_doi_diem(diem10)[1]
 
 
 def xep_loai_hoc_luc(gpa4):
@@ -368,26 +404,33 @@ def xep_loai_hoc_luc(gpa4):
 
 
 def tinh_gpa(mon_list):
-    """mon_list: [(so_tin_chi, diem_tk)]. Trả về (gpa4, gpa10, so_tc_dat) hoặc None nếu chưa có môn nào."""
-    tong_tc = sum(tc for tc, _ in mon_list)
+    """mon_list: [(so_tin_chi, diem_tk[, rot])]. Trả về (gpa4, gpa10, so_tc_dat) hoặc None nếu chưa có môn nào.
+    Môn rot=True (cấm thi / cuối kỳ bằng 0) tính 0 điểm thang 4 và không được cộng tín chỉ đạt."""
+    mon_list = [(m[0], m[1], bool(m[2]) if len(m) > 2 else False) for m in mon_list]
+    tong_tc = sum(tc for tc, _, _ in mon_list)
     if not mon_list or tong_tc <= 0:
         return None
-    d10 = sum(tc * tk for tc, tk in mon_list) / tong_tc
-    d4 = sum(tc * quy_doi_he4(tk) for tc, tk in mon_list) / tong_tc
-    tc_dat = sum(tc for tc, tk in mon_list if tk >= DIEM_DAT)
+    d10 = sum(tc * tk for tc, tk, _ in mon_list) / tong_tc
+    d4 = sum(tc * (0.0 if rot else quy_doi_he4(tk)) for tc, tk, rot in mon_list) / tong_tc
+    tc_dat = sum(tc for tc, tk, rot in mon_list if tk >= DIEM_DAT and not rot)
     return round(d4, 2), round(d10, 2), tc_dat
+
+
+def diem_he4_lan_hoc(lan):
+    """lan = (so_tin_chi, diem_tk, rot) -> điểm hệ 4 của lần học đó (môn rớt = 0)."""
+    return 0.0 if lan[2] else quy_doi_he4(lan[1])
 
 
 def tong_hop_gpa(rows):
     """Tổng hợp GPA từng học kỳ + tích lũy cho 1 sinh viên.
     - Học kỳ tính ngay trên các môn đã có điểm tổng kết (dù mới có 1 môn, dù kỳ chưa kết thúc);
       chưa có môn nào có điểm tổng kết thì để None.
-    - Tích lũy gồm mọi môn đã có điểm tổng kết tính đến học kỳ đó (học lại: lấy lần học mới nhất)."""
+    - Tích lũy gồm mọi môn đã có điểm tổng kết tính đến học kỳ đó (học lại: lấy lần học có điểm cao nhất)."""
     nhom = {}
     for r in rows:
         nhom.setdefault((r["nam_hoc"], r["hoc_ky"]), []).append(r)
 
-    lan_hoc = {}  # ma_mon -> (so_tin_chi, diem_tk)
+    lan_hoc = {}  # ma_mon -> (so_tin_chi, diem_tk, rot)
     ket_qua = []
 
     def goi_tich_luy():
@@ -404,9 +447,13 @@ def tong_hop_gpa(rows):
         hoan_thanh = trang_thai_theo_thoi_gian(hk, nam) == "HOAN_THANH"
         co_diem = [r for r in ds if r["diem_tk"] is not None]
 
-        g = tinh_gpa([(r["so_tin_chi"], r["diem_tk"]) for r in co_diem]) if co_diem else None
+        g = tinh_gpa([(r["so_tin_chi"], r["diem_tk"], r.get("co_diem_0")) for r in co_diem]) if co_diem else None
         for r in co_diem:
-            lan_hoc[r["ma_mon"]] = (r["so_tin_chi"], r["diem_tk"])
+            moi = (r["so_tin_chi"], r["diem_tk"], r.get("co_diem_0"))
+            cu = lan_hoc.get(r["ma_mon"])
+            # Học lại: lấy lần có điểm hệ 4 cao nhất (môn rớt tính 0); bằng nhau thì lấy lần mới hơn
+            if cu is None or diem_he4_lan_hoc(moi) >= diem_he4_lan_hoc(cu):
+                lan_hoc[r["ma_mon"]] = moi
 
         ket_qua.append({
             "nam_hoc": nam,
@@ -451,6 +498,18 @@ def xem_tat_ca():
     return ADMIN_XEM_TAT_CA or request.args.get("all") == "1"
 
 
+def co_the_sua_diem(trang_thai):
+    """Giảng viên: chỉ sửa điểm lớp ĐANG dạy. Admin: sửa được cả lớp ĐANG dạy lẫn đã HOÀN THÀNH."""
+    if trang_thai == "DANG_DAY":
+        return True
+    return trang_thai == "HOAN_THANH" and bool(session.get("is_admin"))
+
+
+def che_do_lich_su():
+    """?lich_su=1: màn "Lịch sử giảng dạy" - chỉ XEM các lớp mình đã dạy xong (không sửa được)."""
+    return request.args.get("lich_su") == "1" and not xem_tat_ca()
+
+
 def lay_phan_cong(conn, lop_id, mon_id=None):
     """Các phân công của giảng viên đang đăng nhập (hoặc của mọi GV nếu là Admin xem tất cả) trong 1 lớp."""
     sql = """
@@ -472,6 +531,12 @@ def lay_phan_cong(conn, lop_id, mon_id=None):
     for r in conn.execute(sql, params).fetchall():
         d = dict(r)
         d["trang_thai"] = trang_thai_theo_thoi_gian(d["hoc_ky"], d["nam_hoc"])
+        # Ngoài chế độ "xem tất cả" của Admin:
+        #   - "Lớp học của tôi": chỉ các lớp ĐANG giảng dạy (nhập/sửa điểm được)
+        #   - "Lịch sử giảng dạy" (?lich_su=1): chỉ các lớp MÌNH đã dạy xong (chỉ xem)
+        if not xem_tat_ca():
+            if d["trang_thai"] != ("HOAN_THANH" if che_do_lich_su() else "DANG_DAY"):
+                continue
         rows.append(d)
     rows.sort(key=thu_tu_hien_thi)
     return rows
@@ -603,23 +668,63 @@ def api_sv_bang_diem():
         conn.close()
         return loi("Không tìm thấy hồ sơ sinh viên.", 404)
 
+    lop_id = conn.execute("SELECT lop_hoc_id FROM sinh_vien WHERE id = ?", (sv["id"],)).fetchone()[0]
+    # Mọi môn của lớp (mỗi kỳ ~8 môn) + điểm của sinh viên nếu đã có; môn chưa có điểm vẫn hiện, ô điểm = "Chưa có".
     rows = conn.execute("""
-        SELECT mh.ma_mon, mh.ten_mon, mh.so_tin_chi,
+        SELECT pc.id AS pc_id, mh.ma_mon, mh.ten_mon, mh.so_tin_chi,
+               mh.ty_le_cc, mh.ty_le_bt, mh.ty_le_gk, mh.ty_le_ck,
                pc.hoc_ky, pc.nam_hoc,
+               bd.id AS bd_id,
                bd.diem_chuyen_can AS diem_cc,
                bd.diem_bai_tap AS diem_bt,
                bd.diem_giua_ky AS diem_gk,
                bd.diem_cuoi_ky AS diem_ck,
                bd.diem_tong_ket AS diem_tk
-        FROM bang_diem bd
-        JOIN phan_cong_giang_day pc ON bd.phan_cong_id = pc.id
+        FROM phan_cong_giang_day pc
         JOIN mon_hoc mh ON pc.mon_hoc_id = mh.id
-        WHERE bd.sinh_vien_id = ?
-        ORDER BY pc.nam_hoc DESC, pc.hoc_ky DESC, mh.ma_mon
-    """, (sv["id"],)).fetchall()
+        LEFT JOIN bang_diem bd ON bd.phan_cong_id = pc.id AND bd.sinh_vien_id = ?
+        WHERE pc.lop_hoc_id = ? OR bd.id IS NOT NULL
+    """, (sv["id"], lop_id)).fetchall()
 
     conn.close()
+    rows = [dict(r) for r in rows]
+    rows = [r for r in rows
+            if trang_thai_theo_thoi_gian(r["hoc_ky"], r["nam_hoc"]) != "CHUA_BAT_DAU" or r["bd_id"] is not None]
+    rows.sort(key=lambda r: khoa_hoc_ky(r["hoc_ky"], r["nam_hoc"]))
+
+    # Môn học lại: chỉ hiện dòng "Chưa có" của lần học sau nếu sinh viên chưa qua môn ở các lần trước.
+    lan_truoc = {}   # ma_mon -> các lần học trước của sinh viên (đã có dòng điểm)
+    pc_truoc = {}    # ma_mon -> số kỳ khác của lớp đã mở môn này
+    hien = []
+    for r in rows:
+        kq_cu = lan_truoc.setdefault(r["ma_mon"], [])
+        ky_cu = pc_truoc.setdefault(r["ma_mon"], set())
+        ky = (r["nam_hoc"], r["hoc_ky"])
+        if r["bd_id"] is not None:
+            hien.append(r)
+            _, rot = danh_gia_diem(r["diem_cc"], r["diem_bt"], r["diem_gk"], r["diem_ck"],
+                                   r["ty_le_cc"], r["ty_le_bt"], r["ty_le_gk"], r["ty_le_ck"])
+            kq_cu.append((khoa_hoc_ky(r["hoc_ky"], r["nam_hoc"]), r["diem_tk"], rot))
+        else:
+            truoc = [k for k in ky_cu if khoa_hoc_ky(k[1], k[0]) < khoa_hoc_ky(r["hoc_ky"], r["nam_hoc"])]
+            if not truoc:                       # lần mở đầu tiên của môn -> hiện (chưa có điểm)
+                hien.append(r)
+            elif kq_cu:                         # đã học trước đó: chỉ hiện nếu lần gần nhất chưa đạt
+                _, tk, rot = max(kq_cu)
+                if tk is not None and (rot or tk < DIEM_DAT):
+                    hien.append(r)
+        ky_cu.add(ky)
+    rows = sorted(hien, key=lambda r: (-khoa_hoc_ky(r["hoc_ky"], r["nam_hoc"])[0],
+                                       -khoa_hoc_ky(r["hoc_ky"], r["nam_hoc"])[1], r["ma_mon"]))
+    for r in rows:
+        r.pop("pc_id", None)
+        r.pop("bd_id", None)
     bang_diem = [dict(r) for r in rows]
+    for r in bang_diem:
+        r["cam_thi"], r["co_diem_0"] = danh_gia_diem(
+            r["diem_cc"], r["diem_bt"], r["diem_gk"], r["diem_ck"],
+            r["ty_le_cc"], r["ty_le_bt"], r["ty_le_gk"], r["ty_le_ck"])
+        r["diem_chu"], r["diem_he4"] = quy_doi_diem(r["diem_tk"], r["co_diem_0"])
     return jsonify({
         "sinh_vien": dict(sv),
         "bang_diem": bang_diem,
@@ -656,6 +761,9 @@ def api_classes():
 
     for r in rows:
         r["trang_thai"] = trang_thai_theo_thoi_gian(r["hoc_ky"], r["nam_hoc"])
+    if not xem_tat_ca():   # "Lớp học của tôi": lớp đang dạy; "Lịch sử giảng dạy" (?lich_su=1): lớp đã dạy xong
+        muc_tieu = "HOAN_THANH" if che_do_lich_su() else "DANG_DAY"
+        rows = [r for r in rows if r["trang_thai"] == muc_tieu]
     rows.sort(key=thu_tu_hien_thi)
     return jsonify(rows)
 
@@ -678,36 +786,45 @@ def api_class_detail(ma_lop):
         conn.close()
         return loi("Bạn không được phân công dạy lớp này.", 403)
 
-    subjects_ids, seen = [], set()
-    for p in pcs:
-        if p["mon_hoc_id"] not in seen:
-            seen.add(p["mon_hoc_id"])
-            subjects_ids.append(p["mon_hoc_id"])
-
-    if subjects_ids:
-        marks = ",".join("?" * len(subjects_ids))
-        subjects = conn.execute(
-            f"SELECT * FROM mon_hoc WHERE id IN ({marks}) ORDER BY ma_mon",
-            subjects_ids
-        ).fetchall()
-    else:
-        subjects = conn.execute("SELECT * FROM mon_hoc ORDER BY ma_mon").fetchall()
-
-    mon_id = request.args.get("mon_id", type=int)
-    if mon_id not in {s["id"] for s in subjects}:
-        mon_id = subjects[0]["id"] if subjects else None
-
-    if mon_id is None:
+    if not pcs:
         conn.close()
         return loi("Lớp này chưa có môn học nào được phân công.", 404)
 
-    pc = next((p for p in pcs if p["mon_hoc_id"] == mon_id), None)
+    # Mỗi PHÂN CÔNG (môn + học kỳ) là một mục riêng, để môn học lại không che mất lần học cũ.
+    mon_rows = {m["id"]: dict(m) for m in conn.execute("SELECT * FROM mon_hoc")}
+    dem_mon = {}
+    for p in pcs:
+        dem_mon[p["mon_hoc_id"]] = dem_mon.get(p["mon_hoc_id"], 0) + 1
+    dem_mon_ky = {}
+    for p in pcs:
+        k = (p["mon_hoc_id"], p["hoc_ky"], p["nam_hoc"])
+        dem_mon_ky[k] = dem_mon_ky.get(k, 0) + 1
+
+    subjects = []
+    for p in sorted(pcs, key=lambda p: (p["ma_mon"], thu_tu_hien_thi(p))):
+        s = dict(mon_rows[p["mon_hoc_id"]])
+        s["pc_id"] = p["id"]
+        s["hoc_ky"], s["nam_hoc"], s["trang_thai"] = p["hoc_ky"], p["nam_hoc"], p["trang_thai"]
+        nhan = f"{p['ma_mon']} - {p['ten_mon']}"
+        if dem_mon[p["mon_hoc_id"]] > 1 or che_do_lich_su():   # môn học nhiều lần / lịch sử -> ghi rõ học kỳ
+            nhan += f" • HK{p['hoc_ky']} {p['nam_hoc']}"
+        if dem_mon_ky[(p["mon_hoc_id"], p["hoc_ky"], p["nam_hoc"])] > 1:   # nhiều GV cùng môn/kỳ (Admin)
+            nhan += f" • {p['gv_phu_trach']}"
+        s["nhan"] = nhan
+        subjects.append(s)
+
+    pc_id_req = request.args.get("pc_id", type=int)
+    mon_id_req = request.args.get("mon_id", type=int)
+    pc = next((p for p in pcs if p["id"] == pc_id_req), None)          # pcs đã lọc theo quyền của người đăng nhập
+    if pc is None and mon_id_req is not None:
+        pc = next((p for p in pcs if p["mon_hoc_id"] == mon_id_req), None)   # pcs đã xếp: kỳ đang dạy/mới nhất trước
     if pc is None:
-        conn.close()
-        return loi("Không tìm thấy phân công cho môn này.", 404)
+        pc = pcs[0]
+    mon_id = pc["mon_hoc_id"]
 
     trang_thai = pc["trang_thai"]
-    co_quyen_sua_diem = bool(tat_ca or trang_thai == "DANG_DAY")
+    # Giảng viên chỉ nhập/sửa điểm lớp đang giảng dạy; Admin được sửa cả lớp đã hoàn thành.
+    co_quyen_sua_diem = co_the_sua_diem(trang_thai)
 
     students = conn.execute("""
         SELECT sv.id AS sv_id, sv.mssv AS mssv, sv.ho_ten,
@@ -726,13 +843,21 @@ def api_class_detail(ma_lop):
 
     conn.close()
 
+    mon_ht = mon_rows[mon_id]
+    students = [dict(s) for s in students]
+    for s in students:
+        s["cam_thi"], s["co_diem_0"] = danh_gia_diem(
+            s["diem_cc"], s["diem_bt"], s["diem_gk"], s["diem_ck"],
+            mon_ht["ty_le_cc"], mon_ht["ty_le_bt"], mon_ht["ty_le_gk"], mon_ht["ty_le_ck"])
+        s["diem_chu"], s["diem_he4"] = quy_doi_diem(s["diem_tk"], s["co_diem_0"])
+
     return jsonify({
         "ma_lop": ma_lop,
         "khoa": lop["khoa"],
         "current_pc_id": pc["id"],
         "current_mon_id": mon_id,
         "subjects": [dict(s) for s in subjects],
-        "students": [dict(s) for s in students],
+        "students": students,
         "co_quyen_sua_diem": co_quyen_sua_diem,
         "trang_thai_lop": trang_thai,
         "hoc_ky_lop": f"HK{pc['hoc_ky']} • {pc['nam_hoc']}"
@@ -770,9 +895,18 @@ def api_update_grades(ma_lop):
         return loi("Không tìm thấy phân công dạy môn này ở lớp này.", 403)
 
     pc = pcs[0]
-    if not xem_tat_ca() and pc["trang_thai"] != "DANG_DAY":
+    pc_id_req = body.get("pc_id")
+    if pc_id_req is not None:        # đúng phân công (môn + học kỳ) đang mở trên màn hình
+        try:
+            pc = next(p for p in pcs if p["id"] == int(pc_id_req))
+        except (StopIteration, TypeError, ValueError):
+            conn.close()
+            return loi("Phân công không hợp lệ hoặc không thuộc quyền của bạn.", 403)
+    if not co_the_sua_diem(pc["trang_thai"]):
         conn.close()
-        return loi("Môn này không thuộc học kỳ hiện tại nên chỉ được xem, không được sửa điểm.", 403)
+        if pc["trang_thai"] == "HOAN_THANH":
+            return loi("Lớp học phần đã hoàn thành nên giảng viên chỉ được xem. Chỉ Admin mới được sửa điểm.", 403)
+        return loi("Lớp học phần chưa bắt đầu nên chưa thể nhập điểm.", 403)
 
     sv_hop_le = {
         r["id"] for r in conn.execute(
@@ -798,7 +932,12 @@ def api_update_grades(ma_lop):
                 )
                 continue
 
-            diem_tk = tinh_tong_ket(
+            cam_thi, _ = danh_gia_diem(diem_cc, diem_bt, diem_gk, diem_ck,
+                                       mon["ty_le_cc"], mon["ty_le_bt"], mon["ty_le_gk"], mon["ty_le_ck"])
+            if cam_thi and diem_ck is not None:
+                raise ValueError("Sinh viên có cột điểm bằng 0 nên không được thi, không được nhập điểm cuối kỳ.")
+
+            diem_ck, diem_tk, _, _ = chuan_hoa_diem(
                 diem_cc, diem_bt, diem_gk, diem_ck,
                 mon["ty_le_cc"], mon["ty_le_bt"], mon["ty_le_gk"], mon["ty_le_ck"]
             )
@@ -850,7 +989,12 @@ def api_admin_mon_hoc():
         return e
     conn = get_db_connection()
     if request.method == "GET":
-        rows = conn.execute("SELECT * FROM mon_hoc ORDER BY ma_mon").fetchall()
+        rows = conn.execute("""
+            SELECT mh.*,
+                   (SELECT COUNT(*) FROM phan_cong_giang_day pc WHERE pc.mon_hoc_id = mh.id) AS so_phan_cong
+            FROM mon_hoc mh
+            ORDER BY mh.ma_mon
+        """).fetchall()
         conn.close()
         return jsonify([dict(r) for r in rows])
 
@@ -888,6 +1032,18 @@ def api_admin_mon_hoc_id(mon_id):
         return e
     conn = get_db_connection()
     if request.method == "DELETE":
+        mon = conn.execute("SELECT ma_mon FROM mon_hoc WHERE id = ?", (mon_id,)).fetchone()
+        if not mon:
+            conn.close()
+            return loi("Môn học không tồn tại.", 404)
+        # Tính mọi phân công, kể cả các phân công đã hoàn thành.
+        so_pc = conn.execute(
+            "SELECT COUNT(*) FROM phan_cong_giang_day WHERE mon_hoc_id = ?", (mon_id,)
+        ).fetchone()[0]
+        if so_pc > 0:
+            conn.close()
+            return loi(f"Không thể xóa môn {mon['ma_mon']} vì đã có {so_pc} phân công giảng dạy "
+                       f"(kể cả phân công đã hoàn thành).", 409)
         conn.execute("DELETE FROM mon_hoc WHERE id = ?", (mon_id,))
         conn.commit()
         conn.close()
@@ -926,9 +1082,9 @@ def api_admin_mon_hoc_id(mon_id):
         JOIN phan_cong_giang_day pc ON bd.phan_cong_id = pc.id
         WHERE pc.mon_hoc_id = ?
     """, (mon_id,)).fetchall():
-        tk = tinh_tong_ket(r["diem_chuyen_can"], r["diem_bai_tap"], r["diem_giua_ky"], r["diem_cuoi_ky"],
-                           ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
-        conn.execute("UPDATE bang_diem SET diem_tong_ket = ? WHERE id = ?", (tk, r["id"]))
+        ck, tk, _, _ = chuan_hoa_diem(r["diem_chuyen_can"], r["diem_bai_tap"], r["diem_giua_ky"], r["diem_cuoi_ky"],
+                                      ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck)
+        conn.execute("UPDATE bang_diem SET diem_cuoi_ky = ?, diem_tong_ket = ? WHERE id = ?", (ck, tk, r["id"]))
     conn.commit()
     conn.close()
     return jsonify({"message": "Cập nhật môn học thành công!"})

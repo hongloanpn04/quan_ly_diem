@@ -31,7 +31,7 @@
         .btn { padding: 8px 18px; border-radius: 8px; border: 1px solid transparent; font-size: .87rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all .2s ease; letter-spacing: .2px; }
         .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15,27,45,.18); }
         .btn:active { transform: translateY(0); }
-        .btn-primary { background: linear-gradient(135deg, var(--accent), var(--navy)); color: #fff; }
+        .btn-primary { background: linear-gradient(135deg, #152339); color: #fff; }
         .btn-success { background: linear-gradient(135deg, #3a8a68, #2a6b50); color: #fff; }
         .btn-danger { background: linear-gradient(135deg, #b4443c, #8f2f29); color: #fff; }
         .btn-warning { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #241c0b; }
@@ -101,15 +101,18 @@
         .password-rule.invalid { color: #b4443c; font-weight: 600; }
         .password-rule::before { content: "✗ "; }
         .password-rule.valid::before { content: "✓ "; }
-        .grade-input { width: 84px; text-align: center; font-weight: 700; margin: 0 auto; display: block; }
+        .grade-input { width: 96px; text-align: center; font-weight: 700; margin: 0 auto; display: block; }
+        .grade-input::placeholder { text-align: center; font-size: .85rem; font-weight: 600; opacity: 1; }
+        .grade-input:disabled, .grade-input[readonly] { text-align: center; padding-left: 8px; padding-right: 8px; -moz-appearance: textfield; appearance: textfield; }
+        .grade-input:disabled::-webkit-inner-spin-button, .grade-input[readonly]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
         /* MODAL */
         .modal-overlay { position: fixed; inset: 0; background: rgba(15,27,45,.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn .2s ease; }
         .modal-box { background: #fff; width: 90%; max-width: 480px; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.35); animation: popIn .25s ease; }
-        .modal-header { padding: 15px 22px; background: linear-gradient(90deg, var(--navy), var(--navy-2)); color: #fff; display: flex; justify-content: space-between; align-items: center; font-family: var(--serif); font-weight: 600; border-bottom: 2px solid var(--gold); }
+        .modal-header { padding: 15px 22px; background: linear-gradient(90deg, rgb(145, 114, 3), var(--line)); color: #fff; display: flex; justify-content: space-between; align-items: center; font-family: var(--serif); font-weight: 600; border-bottom: 2px solid var(--accent); }
         .modal-close { background: none; border: none; color: #fff; font-size: 1.4rem; cursor: pointer; }
         .modal-body { padding: 22px; }
-        .modal-footer { padding: 14px 22px; background: #faf7f0; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-footer { padding: 14px 22px; background: #f7f1dc; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
         .form-group { margin-bottom: 16px; text-align: left; }
         .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: .8rem; color: #4a4030; text-transform: uppercase; letter-spacing: .6px; }
         .d-none { display: none !important; }
@@ -197,9 +200,15 @@
 
         <!-- Menu chức năng cho Admin (Đã bỏ phân công giảng dạy) -->
         <nav id="navAdminControls" class="nav-links d-none">
-            <button class="btn btn-outline-light btn-sm" onclick="chuyenManHinh('viewDanhSachLop'); taiDanhSachLop();">Lớp Học Của Tôi</button>
+            <button class="btn btn-outline-light btn-sm" onclick="hienLopDangDay()">Lớp Học Của Tôi</button>
             <button class="btn btn-warning btn-sm" onclick="chuyenManHinh('viewQuanLyMonHoc'); taiDanhSachMonHoc();">Quản Lý Môn Học</button>
             <button class="btn btn-warning btn-sm" onclick="chuyenManHinh('viewQuanLyLopHoc'); taiDanhSachQuanLyLop();">Quản Lý Lớp Học</button>
+        </nav>
+
+        <!-- Menu cho giảng viên thường -->
+        <nav id="navGiangVien" class="nav-links d-none">
+            <button class="btn btn-outline-light btn-sm" onclick="hienLopDangDay()">Lớp Đang Dạy</button>
+            <button class="btn btn-outline-light btn-sm" onclick="hienLichSuGiangDay()">Lịch Sử Giảng Dạy</button>
         </nav>
 
         <div id="userHeader" class="user-panel d-none">
@@ -265,6 +274,8 @@
                                 <th>Giữa Kỳ</th>
                                 <th>Cuối Kỳ</th>
                                 <th>Tổng Kết</th>
+                                <th>Điểm Hệ 4</th>
+                                <th>Xếp Loại</th>
                                 <th>Kết Quả</th>
                             </tr>
                         </thead>
@@ -272,19 +283,14 @@
                     </table>
                 </div>
             </div>
-
-            <div class="card">
-                <div class="card-header">Kết Quả Tích Lũy Hiện Tại</div>
-                <div id="svTichLuy"></div>
-            </div>
         </section>
 
         <!-- 3. MÀN HÌNH DANH SÁCH LỚP PHỤ TRÁCH -->
         <section id="viewDanhSachLop" class="d-none">
             <div style="text-align: center; margin-bottom: 24px;">
-                <h2 style="color: var(--accent); margin-bottom: 6px;">DANH SÁCH LỚP HỌC PHẦN PHỤ TRÁCH</h2>
-                <p style="color: var(--muted); font-size: 0.9rem;">Các lớp học phần bạn trực tiếp được phân công giảng dạy.</p>
-                <p style="margin-top: 6px;"><span class="badge badge-active">Học kỳ hiện tại: <b id="hocKyHienTai">...</b></span></p>
+                <h2 id="tieuDeDanhSachLop" style="color: var(--accent); margin-bottom: 6px;">DANH SÁCH LỚP HỌC PHẦN PHỤ TRÁCH</h2>
+                <p id="moTaDanhSachLop" style="color: var(--muted); font-size: 0.9rem;">Các lớp học phần bạn đang giảng dạy trong học kỳ hiện tại.</p>
+                <p id="dongHocKyHienTai" style="margin-top: 6px;"><span class="badge badge-active">Học kỳ hiện tại: <b id="hocKyHienTai">...</b></span></p>
             </div>
             <div id="classList" class="class-grid"></div>
         </section>
@@ -311,6 +317,11 @@
                 </div>
             </div>
 
+            <div id="canhBaoSuaDiemAdmin" class="d-none"
+                 style="margin-bottom: 14px; padding: 10px 16px; border-radius: 8px; background: #fff7e0; border: 1px solid #f0c36d; color: #7a5200; font-size: 0.9rem;">
+                Lớp học phần này <b>đã hoàn thành</b>. Với quyền <b>Admin</b>, bạn vẫn có thể sửa điểm và bấm <b>Lưu Bảng Điểm</b> ở cuối bảng.
+            </div>
+
             <!-- THANH TÌM KIẾM SINH VIÊN TỨC THỜI TRONG LỚP -->
             <div class="card" style="margin-bottom: 14px;">
                 <div class="card-body" style="padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -328,7 +339,6 @@
             <div class="card">
                 <div class="card-header">
                     <span>Sổ Điểm: <span id="labelTenMon"></span></span>
-                    <button id="btnLuuDiemTop" class="btn btn-warning btn-sm d-none" onclick="luuDiem()">Lưu Bảng Điểm</button>
                 </div>
                 <div class="table-responsive">
                     <table>
@@ -342,6 +352,8 @@
                                 <th id="thGiuaKy" style="width: 110px;">Giữa Kỳ</th>
                                 <th id="thCuoiKy" style="width: 110px;">Cuối Kỳ</th>
                                 <th style="width: 100px;">Tổng Kết</th>
+                                <th style="width: 90px;">Điểm Hệ 4</th>
+                                <th style="width: 90px;">Xếp Loại</th>
                                 <th style="width: 110px;">Kết Quả</th>
                             </tr>
                         </thead>
@@ -490,7 +502,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="dongModal('modalDoiMatKhau')">Hủy</button>
-                    <button type="submit" class="btn btn-primary">Đổi mật khẩu</button>
+                    <button type="submit" class="btn btn-primary    ">Đổi mật khẩu</button>
                 </div>
             </form>
         </div>
@@ -541,6 +553,7 @@
         let currentLop = null;
         let xemTatCa = false;   // true khi Admin mở sổ điểm từ menu QL Lớp Học
         let currentMonId = null;
+        let currentPcId = null;   // phân công (môn + học kỳ) đang mở
         let studentsList = [];
         let subjectsList = [];
         let coQuyenSua = false;
@@ -573,6 +586,18 @@
                     }
                 });
         });
+
+        let cheDoLichSu = false;   // false: Lớp đang dạy | true: Lịch sử giảng dạy (chỉ xem)
+        function hienLopDangDay() {
+            cheDoLichSu = false;
+            chuyenManHinh("viewDanhSachLop");
+            taiDanhSachLop();
+        }
+        function hienLichSuGiangDay() {
+            cheDoLichSu = true;
+            chuyenManHinh("viewDanhSachLop");
+            taiDanhSachLop();
+        }
 
         function chuyenManHinh(viewId) {
             ["viewLogin", "viewSinhVien", "viewDanhSachLop", "viewSoDiemLop", "viewQuanLyMonHoc", "viewQuanLyLopHoc"].forEach(id => {
@@ -611,16 +636,18 @@
 
                 if (isAdmin) {
                     document.getElementById("navAdminControls").classList.remove("d-none");
+                    document.getElementById("navGiangVien").classList.add("d-none");
                 } else {
                     document.getElementById("navAdminControls").classList.add("d-none");
+                    document.getElementById("navGiangVien").classList.remove("d-none");
                 }
 
-                chuyenManHinh("viewDanhSachLop");
-                taiDanhSachLop();
+                hienLopDangDay();
             } else {
                 document.getElementById("userBadge").textContent = "Sinh viên";
                 document.getElementById("userBadge").className = "badge badge-student";
                 document.getElementById("navAdminControls").classList.add("d-none");
+                document.getElementById("navGiangVien").classList.add("d-none");
                 chuyenManHinh("viewSinhVien");
                 taiDiemSinhVien();
             }
@@ -755,11 +782,13 @@
             return `<div class="gpa-box">
                 <div class="gpa-col">
                     ${gpaDong("Điểm trung bình học kỳ hệ 10", hk.gpa10)}
+                    ${gpaDong("Điểm trung bình học kỳ hệ 4", hk.gpa4)}
                     ${gpaDong("Số tín chỉ đạt học kỳ", hk.tc_dat)}
                     ${gpaDong("Xếp loại học kỳ", hk.xep_loai)}
                 </div>
                 <div class="gpa-col">
                     ${gpaDong("Điểm trung bình tích lũy hệ 10", tl.gpa10)}
+                    ${gpaDong("Điểm trung bình tích lũy hệ 4", tl.gpa4)}
                     ${gpaDong("Số tín chỉ tích lũy", tl.tc_tich_luy)}
                     ${gpaDong("Xếp loại tích lũy", tl.xep_loai)}
                 </div>
@@ -770,6 +799,7 @@
             return `<div class="gpa-box">
                 <div class="gpa-col">
                     ${gpaDong("Điểm trung bình tích lũy hệ 10", tl.gpa10)}
+                    ${gpaDong("Điểm trung bình tích lũy hệ 4", tl.gpa4)}
                     ${gpaDong("Số tín chỉ tích lũy", tl.tc_tich_luy)}
                 </div>
                 <div class="gpa-col">
@@ -802,8 +832,7 @@
                     const tongHop = data.tong_hop || { hoc_ky: [], tich_luy: {} };
                     const gpaTheoKy = {};
                     tongHop.hoc_ky.forEach(h => { gpaTheoKy[`${h.nam_hoc}|${h.hoc_ky}`] = h; });
-                    document.getElementById("svTichLuy").innerHTML = hopGpaTichLuy(tongHop.tich_luy);
-
+        
                     for (let i = 0; i < bangDiem.length; i++) {
 
                         const mh = bangDiem[i];
@@ -891,8 +920,16 @@
                                     ${mh.diem_tk ?? "Chưa có"}
                                 </td>
 
+                                <td class="grade-final">
+                                    ${hienHe4(mh.diem_he4)}
+                                </td>
+
+                                <td class="grade-final">
+                                    ${hienChu(mh.diem_chu)}
+                                </td>
+
                                 <td>
-                                    ${ketQuaMon(mh.diem_tk)}
+                                    ${ketQuaMon(mh.diem_tk, mh.co_diem_0)}
                                 </td>
 
                             </tr>
@@ -903,29 +940,43 @@
                             ? `${bangDiem[i + 1].nam_hoc}|${bangDiem[i + 1].hoc_ky}`
                             : null;
                         if (keyTiep !== groupKey && gpaTheoKy[groupKey]) {
-                            tbody.innerHTML += `<tr class="gpa-row"><td colspan="11">${hopGpaHocKy(gpaTheoKy[groupKey])}</td></tr>`;
+                            tbody.innerHTML += `<tr class="gpa-row"><td colspan="13">${hopGpaHocKy(gpaTheoKy[groupKey])}</td></tr>`;
                         }
                     }
                 });
         }
 
         // GIẢNG VIÊN & ADMIN: TẢI DANH SÁCH LỚP PHỤ TRÁCH
+        // Bỏ dấu tiếng Việt + chữ thường để tìm kiếm không phân biệt dấu ("co so du lieu" khớp "Cơ sở dữ liệu")
+        function chuanHoaTim(s) {
+            return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d").replace(/Đ/g, "d").toLowerCase();
+        }
+
         function taiDanhSachLop() {
-            fetch("/api/classes")
+            const lichSu = cheDoLichSu && !currentUser.is_admin;
+            document.getElementById("tieuDeDanhSachLop").textContent = lichSu ? "LỊCH SỬ GIẢNG DẠY" : "DANH SÁCH LỚP HỌC PHẦN PHỤ TRÁCH";
+            document.getElementById("moTaDanhSachLop").textContent = lichSu
+                ? "Các lớp học phần bạn đã dạy xong. Chỉ được xem điểm, không được chỉnh sửa."
+                : "Các lớp học phần bạn đang giảng dạy trong học kỳ hiện tại.";
+            document.getElementById("dongHocKyHienTai").classList.toggle("d-none", lichSu);
+            fetch(lichSu ? "/api/classes?lich_su=1" : "/api/classes")
                 .then(res => res.json())
                 .then(classes => {
                     const classList = document.getElementById("classList");
                     classList.innerHTML = "";
                     if (classes.length === 0) {
-                        classList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--muted); padding: 30px;">Bạn chưa được phân công dạy lớp học phần nào.</div>`;
+                        classList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--muted); padding: 30px;">${lichSu ? "Bạn chưa có lớp học phần nào đã dạy xong." : "Hiện bạn không có lớp học phần nào đang giảng dạy."}</div>`;
                         return;
                     }
                     // Gộp các phân công cùng một lớp (nhiều môn) thành 1 thẻ.
                     // Danh sách đã được sắp xếp từ backend nên dòng đầu tiên của mỗi lớp là dòng ưu tiên nhất.
                     const nhomLop = new Map();
                     classes.forEach(c => {
-                        if (!nhomLop.has(c.ma_lop)) nhomLop.set(c.ma_lop, { ...c, cacMon: [] });
-                        const nhom = nhomLop.get(c.ma_lop);
+                        // Lịch sử: mỗi (lớp + học kỳ) là một thẻ riêng; Lớp đang dạy: gộp theo lớp
+                        const khoaNhom = lichSu ? `${c.ma_lop}|${c.hoc_ky}|${c.nam_hoc}` : c.ma_lop;
+                        if (!nhomLop.has(khoaNhom)) nhomLop.set(khoaNhom, { ...c, cacMon: [] });
+                        const nhom = nhomLop.get(khoaNhom);
                         nhom.cacMon.push(c);
                         if (c.trang_thai === 'DANG_DAY') {
                             nhom.trang_thai = 'DANG_DAY';
@@ -934,6 +985,14 @@
                     });
 
                     nhomLop.forEach(c => {
+                        // Thẻ chỉ liệt kê các môn của ĐÚNG học kỳ đang hiển thị trên thẻ (không lẫn môn của kỳ cũ / môn học lại),
+                        // mỗi môn một dòng.
+                        const daThay = new Set();
+                        c.cacMon = c.cacMon.filter(m => {
+                            if (m.hoc_ky !== c.hoc_ky || m.nam_hoc !== c.nam_hoc || daThay.has(m.mon_hoc_id)) return false;
+                            daThay.add(m.mon_hoc_id);
+                            return true;
+                        });
                         const isDone = (c.trang_thai !== 'DANG_DAY');
                         const statusBadge = badgeTrangThai(c.trang_thai, 'style="margin-bottom: 8px;"');
                         const dsMon = c.cacMon.map(m =>
@@ -944,7 +1003,7 @@
 
                         const card = document.createElement("div");
                         card.className = "class-card";
-                        card.onclick = () => moSoDiemLop(c.ma_lop, c.cacMon[0].mon_hoc_id);
+                        card.onclick = () => moSoDiemLop(c.ma_lop, c.cacMon[0].mon_hoc_id, false, c.cacMon[0].pc_id);
                         card.innerHTML = `
                             ${statusBadge}
                             <h3 style="color: var(--accent); margin-bottom: 6px;">${esc(c.ma_lop)}</h3>
@@ -952,10 +1011,17 @@
                             <div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 4px;">HK${c.hoc_ky} • ${esc(c.nam_hoc)}</div>
                             ${currentUser.is_admin ? `<div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 4px;">GV: ${esc(dsGv)}</div>` : ""}
                             <div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 14px;">Sĩ số: <strong>${c.so_luong_sv}</strong> sinh viên</div>
-                            <button class="btn ${isDone ? 'btn-outline-secondary' : 'btn-primary'}" style="width: 100%;">
-                                ${isDone ? 'Xem điểm' : 'Vào Sổ Điểm'}
+                            <button class="btn ${(isDone && !(currentUser.is_admin && c.trang_thai === 'HOAN_THANH')) ? 'btn-outline-secondary' : 'btn-primary'}" style="width: 100%;">
+                                ${isDone ? ((currentUser.is_admin && c.trang_thai === 'HOAN_THANH') ? 'Xem / Sửa điểm' : 'Xem điểm') : 'Vào Sổ Điểm'}
                             </button>
                         `;
+                        // Chuỗi dùng cho ô tìm kiếm
+                        card.dataset.tim = chuanHoaTim([
+                            c.ma_lop, c.ten_lop,
+                            ...c.cacMon.flatMap(m => [m.ma_mon, m.ten_mon, m.gv_phu_trach]),
+                            `hk${c.hoc_ky}`, `hoc ky ${c.hoc_ky}`, c.nam_hoc,
+                            isDone ? "da hoan thanh" : "dang giang day"
+                        ].join(" "));
                         classList.appendChild(card);
                     });
                 });
@@ -972,10 +1038,11 @@
             }
         }
 
-        function moSoDiemLop(maLop, monId, tatCa = false) {
+        function moSoDiemLop(maLop, monId, tatCa = false, pcId = null) {
             xemTatCa = tatCa;
             currentLop = maLop;
             currentMonId = monId ? String(monId) : null;
+            currentPcId = pcId ? String(pcId) : null;
             document.getElementById("searchInput").value = "";
             chuyenManHinh("viewSoDiemLop");
             document.getElementById("labelMaLop").textContent = maLop;
@@ -985,8 +1052,10 @@
         function taiDuLieuLopVaDiem() {
             let url = `/api/class/${encodeURIComponent(currentLop)}`;
             const qs = [];
-            if (currentMonId) qs.push(`mon_id=${encodeURIComponent(currentMonId)}`);
+            if (currentPcId) qs.push(`pc_id=${encodeURIComponent(currentPcId)}`);
+            else if (currentMonId) qs.push(`mon_id=${encodeURIComponent(currentMonId)}`);
             if (xemTatCa) qs.push("all=1");
+            else if (cheDoLichSu && !currentUser.is_admin) qs.push("lich_su=1");
             if (qs.length) url += "?" + qs.join("&");
 
             fetch(url)
@@ -995,24 +1064,28 @@
                     studentsList = data.students;
                     subjectsList = data.subjects;
                     currentMonId = String(data.current_mon_id);
+                    currentPcId = String(data.current_pc_id);
                     coQuyenSua = data.co_quyen_sua_diem;
 
                     const statusBadge = document.getElementById("badgeTrangThaiLop");
                     if (data.trang_thai_lop === "DANG_DAY") {
                         statusBadge.className = "badge badge-active";
                         statusBadge.textContent = `Đang giảng dạy (Được nhập điểm) • ${data.hoc_ky_lop}`;
+                    } else if (data.trang_thai_lop === "HOAN_THANH" && coQuyenSua) {
+                        statusBadge.className = "badge badge-active";
+                        statusBadge.textContent = `Đã hoàn thành (Admin được sửa điểm) • ${data.hoc_ky_lop}`;
                     } else {
                         statusBadge.className = "badge badge-done";
-                        statusBadge.textContent = `${data.trang_thai_lop === "HOAN_THANH" ? "Đã hoàn thành" : "Chưa bắt đầu"} (${data.co_quyen_sua_diem ? "Quản trị được sửa điểm" : "Chỉ xem"}) • ${data.hoc_ky_lop}`;
+                        statusBadge.textContent = `${data.trang_thai_lop === "HOAN_THANH" ? "Đã hoàn thành" : "Chưa bắt đầu"} (Chỉ xem) • ${data.hoc_ky_lop}`;
                     }
 
-                    const nutTop = document.getElementById("btnLuuDiemTop");
+                    document.getElementById("canhBaoSuaDiemAdmin")
+                        .classList.toggle("d-none", !(data.trang_thai_lop === "HOAN_THANH" && coQuyenSua));
+
                     const nutBot = document.getElementById("btnLuuDiemBottom");
                     if (coQuyenSua) {
-                        nutTop.classList.remove("d-none");
                         nutBot.classList.remove("d-none");
                     } else {
-                        nutTop.classList.add("d-none");
                         nutBot.classList.add("d-none");
                     }
 
@@ -1040,12 +1113,12 @@
             select.innerHTML = "";
             subjectsList.forEach(mon => {
                 const opt = document.createElement("option");
-                opt.value = mon.id;
-                opt.textContent = `${mon.ma_mon} - ${mon.ten_mon}`;
-                if (String(mon.id) === String(currentMonId)) opt.selected = true;
+                opt.value = mon.pc_id;
+                opt.textContent = mon.nhan || `${mon.ma_mon} - ${mon.ten_mon}`;
+                if (String(mon.pc_id) === String(currentPcId)) opt.selected = true;
                 select.appendChild(opt);
             });
-            const monHienTai = subjectsList.find(m => String(m.id) === String(currentMonId));
+            const monHienTai = subjectsList.find(m => String(m.pc_id) === String(currentPcId));
             capNhatTieuDeCot(monHienTai);
             if (monHienTai) {
                 document.getElementById("labelTenMon").textContent = `${monHienTai.ten_mon} (${monHienTai.ma_mon})`;
@@ -1054,7 +1127,9 @@
         }
 
         function doiMonHoc() {
-            currentMonId = document.getElementById("selectMonHoc").value;
+            currentPcId = document.getElementById("selectMonHoc").value;
+            const pcChon = subjectsList.find(m => String(m.pc_id) === String(currentPcId));
+            currentMonId = pcChon ? String(pcChon.id) : currentMonId;
             taiDuLieuLopVaDiem();
         }
 
@@ -1066,7 +1141,7 @@
             document.getElementById("countHienThi").textContent = danhSach.length;
 
             if (danhSach.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="color: var(--muted); padding: 25px;">Không tìm thấy sinh viên nào phù hợp.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" style="color: var(--muted); padding: 25px;">Không tìm thấy sinh viên nào phù hợp.</td></tr>`;
                 return;
             }
 
@@ -1095,10 +1170,12 @@
                     <td>
                         <input type="number" step="0.1" min="0" max="10"
                                class="form-control grade-input"
-                               id="ck_${sv.sv_id}" value="${sv.diem_ck ?? ""}" ${readOnlyAttr}>
+                               id="ck_${sv.sv_id}" value="${sv.cam_thi ? "" : (sv.diem_ck ?? "")}" ${(coQuyenSua && !sv.cam_thi) ? "" : "readonly disabled"} ${sv.cam_thi ? 'placeholder="Cấm thi" title="Có cột điểm bằng 0 nên không được thi cuối kỳ"' : ""}>
                     </td>
                     <td id="tk_${sv.sv_id}">${hienThiTongKet(sv.diem_tk)}</td>
-                    <td id="loai_${sv.sv_id}">${ketQuaMon(sv.diem_tk)}</td>
+                    <td id="he4_${sv.sv_id}">${hienHe4(sv.diem_he4)}</td>
+                    <td id="chu_${sv.sv_id}">${hienChu(sv.diem_chu)}</td>
+                    <td id="loai_${sv.sv_id}">${ketQuaMon(sv.diem_tk, sv.co_diem_0)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1122,6 +1199,25 @@
             hienThiBangSinhVien(studentsList);
         }
 
+        // CHẶN NHẬP KÝ TỰ KHÔNG PHẢI SỐ (e, E, +, -) Ở MỌI Ô SỐ
+        const KY_TU_CAM = /[eE+\-]/;
+        document.addEventListener("keydown", e => {
+            if (e.target.matches && e.target.matches('input[type="number"]') && !e.ctrlKey && !e.metaKey && KY_TU_CAM.test(e.key) && e.key.length === 1) {
+                e.preventDefault();
+            }
+        });
+        document.addEventListener("beforeinput", e => {
+            if (e.target.matches && e.target.matches('input[type="number"]') && e.data && KY_TU_CAM.test(e.data)) {
+                e.preventDefault();
+            }
+        });
+        document.addEventListener("paste", e => {
+            if (e.target.matches && e.target.matches('input[type="number"]')) {
+                const text = (e.clipboardData || window.clipboardData).getData("text").trim();
+                if (!/^\d*\.?\d*$/.test(text)) e.preventDefault();
+            }
+        });
+
         // TÍNH ĐIỂM TỔNG KẾT KHI GÕ
         // Thành phần nào có tỷ lệ > 0 thì bắt buộc phải có điểm mới tính được tổng kết
         function tinhTongKet(diem, tl) {
@@ -1144,29 +1240,79 @@
                 const el = document.getElementById(`${k}_${svId}`);
                 return el ? el.value : "";
             };
-            const tk = tinhTongKet(
-                { cc: val("cc"), bt: val("bt"), gk: val("gk"), ck: val("ck") },
-                tyLeMonHienTai()
-            );
+            const tl = tyLeMonHienTai();
+            const diem = { cc: val("cc"), bt: val("bt"), gk: val("gk"), ck: val("ck") };
+            const camThi = camThiCuoiKy(diem, tl);
+            const elCk = document.getElementById(`ck_${svId}`);
+            if (elCk && coQuyenSua) {
+                if (camThi) {
+                    elCk.value = "";
+                    elCk.disabled = true;
+                    elCk.readOnly = true;
+                    elCk.placeholder = "Cấm thi";
+                    elCk.title = "Có cột điểm bằng 0 nên không được thi cuối kỳ";
+                    diem.ck = "";
+                } else {
+                    elCk.disabled = false;
+                    elCk.readOnly = false;
+                    elCk.placeholder = "";
+                    elCk.title = "";
+                }
+            }
+            // Cấm thi: điểm cuối kỳ tính 0 khi tính tổng kết
+            const tk = tinhTongKet(camThi ? { ...diem, ck: "0" } : diem, tl);
             document.getElementById(`tk_${svId}`).innerHTML = hienThiTongKet(tk);
-            document.getElementById(`loai_${svId}`).innerHTML = ketQuaMon(tk);
+            const rot = monRot(diem, tl);
+            const [chu, he4] = quyDoiDiem(tk, rot);
+            document.getElementById(`he4_${svId}`).innerHTML = hienHe4(he4);
+            document.getElementById(`chu_${svId}`).innerHTML = hienChu(chu);
+            document.getElementById(`loai_${svId}`).innerHTML = ketQuaMon(tk, rot);
         });
 
         function hienThiTongKet(diem) {
             return (diem === null || diem === undefined) ? `<span style="color: var(--muted); font-style: italic;">Chưa có</span>` : `<strong style="color: var(--accent);">${diem}</strong>`;
         }
 
-        // Kết quả môn: dấu tick xanh khi điểm tổng kết >= 4.0, dấu X đỏ khi dưới 4.0 (icon nét đậm, đầu tròn)
+        // Kết quả môn: tick xanh khi tổng kết >= 4.0; dấu X đỏ khi dưới 4.0, bị cấm thi hoặc cuối kỳ bằng 0
         const ICON_DAT = `<svg class="kq-icon" viewBox="0 0 24 24" role="img" aria-label="Đạt"><title>Đạt</title><path d="M4.5 12.8l5 5L19.5 6.2" fill="none" stroke="#4d9a00" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         const ICON_TRUOT = `<svg class="kq-icon" viewBox="0 0 24 24" role="img" aria-label="Không đạt"><title>Không đạt</title><path d="M5.5 5.5l13 13M18.5 5.5l-13 13" fill="none" stroke="#cc0000" stroke-width="4.4" stroke-linecap="round"/></svg>`;
 
-        function ketQuaMon(diem) {
+        // Quy đổi thang 10 -> [điểm chữ, thang 4] theo bảng PTIT. Môn rớt (cấm thi / cuối kỳ = 0) luôn là F - 0.0
+        const BANG_QUY_DOI = [[9.0, "A+", 4.0], [8.5, "A", 3.7], [8.0, "B+", 3.5], [7.0, "B", 3.0],
+                              [6.5, "C+", 2.5], [5.5, "C", 2.0], [5.0, "D+", 1.5], [4.0, "D", 1.0]];
+        function quyDoiDiem(tk, rot = false) {
+            if (rot) return ["F", 0];
+            if (tk === null || tk === undefined || tk === "") return [null, null];
+            const d = Number(tk);
+            for (const [nguong, chu, he4] of BANG_QUY_DOI) if (d >= nguong) return [chu, he4];
+            return ["F", 0];
+        }
+        function hienHe4(v) {
+            return (v === null || v === undefined) ? `<span style="color: var(--muted);">—</span>` : `<strong style="color: var(--accent);">${Number(v).toFixed(1)}</strong>`;
+        }
+        function hienChu(c) {
+            return c ? `<strong style="color: ${c === "F" ? "#cc0000" : "var(--accent)"};">${c}</strong>` : `<span style="color: var(--muted);">—</span>`;
+        }
+
+        // Cấm thi: CC/BT/GK (tỷ lệ > 0) có cột bằng 0 -> không được nhập điểm cuối kỳ, môn rớt
+        function camThiCuoiKy(diem, tl) {
+            return ["cc", "bt", "gk"].some(k =>
+                tl[k] > 0 && diem[k] !== "" && diem[k] !== null && diem[k] !== undefined && Number(diem[k]) === 0);
+        }
+        // Rớt: bị cấm thi, hoặc điểm cuối kỳ bằng 0
+        function monRot(diem, tl) {
+            const ck0 = tl.ck > 0 && diem.ck !== "" && diem.ck !== null && diem.ck !== undefined && Number(diem.ck) === 0;
+            return camThiCuoiKy(diem, tl) || ck0;
+        }
+
+        function ketQuaMon(diem, rot = false) {
+            if (rot) return ICON_TRUOT;
             if (diem === null || diem === undefined || diem === "") return `<span class="badge badge-done">Chưa xét</span>`;
             return Number(diem) >= 4 ? ICON_DAT : ICON_TRUOT;
         }
 
         function luuDiem() {
-            if (!coQuyenSua) { thongBao("Lớp học phần đã kết thúc, bạn không có quyền sửa điểm."); return; }
+            if (!coQuyenSua) { thongBao("Bạn không có quyền sửa điểm lớp này. Giảng viên chỉ sửa được lớp đang giảng dạy; lớp đã hoàn thành chỉ Admin được sửa."); return; }
             const gradesData = [];
             for (const sv of studentsList) {
                 const elCc = document.getElementById(`cc_${sv.sv_id}`);
@@ -1190,10 +1336,13 @@
             fetch(`/api/class/${encodeURIComponent(currentLop)}/update-grades${xemTatCa ? "?all=1" : ""}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mon_id: Number(currentMonId), grades: gradesData })
+                body: JSON.stringify({ mon_id: Number(currentMonId), pc_id: Number(currentPcId), grades: gradesData })
             })
-            .then(res => res.json())
-            .then(data => { thongBao(data.message); taiDuLieuLopVaDiem(); });
+            .then(res => res.json().then(data => ({ ok: res.ok, data })))
+            .then(({ ok, data }) => {
+                thongBao(data.message || (ok ? "Đã lưu bảng điểm thành công!" : "Không lưu được bảng điểm."));
+                taiDuLieuLopVaDiem();
+            });
         }
 
         // ================= ADMIN: CRUD MÔN HỌC =================
@@ -1212,7 +1361,9 @@
                                 <td>${pct(m.ty_le_cc)} / ${pct(m.ty_le_bt)} / ${pct(m.ty_le_gk)} / ${pct(m.ty_le_ck)}</td>
                                 <td>
                                     <button class="btn btn-outline-primary btn-sm" onclick="moModalSuaMon(${m.id}, '${esc(m.ma_mon)}', '${esc(m.ten_mon)}', ${m.so_tin_chi}, ${m.ty_le_cc}, ${m.ty_le_bt}, ${m.ty_le_gk}, ${m.ty_le_ck})">Sửa</button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="xoaMonHoc(${m.id})">Xóa</button>
+                                    ${m.so_phan_cong > 0
+                                        ? `<button class="btn btn-outline-danger btn-sm" disabled style="opacity:.5;cursor:not-allowed;" title="Môn đã có ${m.so_phan_cong} phân công giảng dạy (kể cả đã hoàn thành), không thể xóa">Xóa</button>`
+                                        : `<button class="btn btn-outline-danger btn-sm" onclick="xoaMonHoc(${m.id})">Xóa</button>`}
                                 </td>
                             </tr>
                         `;
@@ -1339,11 +1490,12 @@
                     <td>HK${c.hoc_ky} • ${esc(c.nam_hoc)}</td>
                     <td>${badgeTrangThai(c.trang_thai)}</td>
                     <td>${c.so_luong_sv} sinh viên</td>
-                    <td><button class="btn ${c.trang_thai === "HOAN_THANH" ? "btn-outline-secondary" : "btn-primary"} btn-sm">
-                        ${c.trang_thai === "HOAN_THANH" ? "Xem điểm" : "Xem / Cập nhật điểm"}
+                    <td><button class="btn ${c.trang_thai === "CHUA_BAT_DAU" ? "btn-outline-secondary" : "btn-primary"} btn-sm">
+                        ${c.trang_thai === "DANG_DAY" ? "Xem / Cập nhật điểm"
+                            : (c.trang_thai === "HOAN_THANH" ? "Xem / Sửa điểm" : "Xem điểm")}
                     </button></td>
                 `;
-                tr.querySelector("button").onclick = () => moSoDiemLop(c.ma_lop, c.mon_hoc_id, true);
+                tr.querySelector("button").onclick = () => moSoDiemLop(c.ma_lop, c.mon_hoc_id, true, c.pc_id);
                 tbody.appendChild(tr);
             });
         }
