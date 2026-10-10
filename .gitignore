@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+venv/
+.env
+*.db
+SECRET_KEY=ptit_secret_key_no_hash
