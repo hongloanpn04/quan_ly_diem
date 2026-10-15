@@ -1,5 +1,5 @@
 __pycache__/
-*.pycv
+*.pyc
 venv/
 .env
 *.db

@@ -29,7 +29,8 @@ app = Flask(
     static_url_path="",
     template_folder=TEMPLATES_DIR,
 )
-app.secret_key = "ptit_secret_key_no_hash"
+# Đọc từ biến môi trường, nếu chưa có thì dùng giá trị mặc định để chạy thử
+app.secret_key = os.environ.get("SECRET_KEY", "ptit_secret_key_no_hash")
 app.json.ensure_ascii = False
 
 
@@ -497,9 +498,8 @@ def xem_tat_ca():
         return False
     return ADMIN_XEM_TAT_CA or request.args.get("all") == "1"
 
-
+"""Giảng viên: chỉ sửa điểm lớp ĐANG dạy. Admin: sửa được cả lớp ĐANG dạy lẫn đã HOÀN THÀNH."""
 def co_the_sua_diem(trang_thai):
-    """Giảng viên: chỉ sửa điểm lớp ĐANG dạy. Admin: sửa được cả lớp ĐANG dạy lẫn đã HOÀN THÀNH."""
     if trang_thai == "DANG_DAY":
         return True
     return trang_thai == "HOAN_THANH" and bool(session.get("is_admin"))
@@ -753,8 +753,10 @@ def api_classes():
         JOIN giang_vien gv ON pc.giang_vien_id = gv.id
     """
     params = ()
+
+    # CHỈ lớp được phân công cho người đăng nhập
     if not xem_tat_ca():
-        sql += " WHERE pc.giang_vien_id = ?"   # CHỈ lớp được phân công cho người đăng nhập
+        sql += " WHERE pc.giang_vien_id = ?"   
         params = (session.get("giang_vien_id"),)
     rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
     conn.close()
@@ -906,6 +908,7 @@ def api_update_grades(ma_lop):
         conn.close()
         if pc["trang_thai"] == "HOAN_THANH":
             return loi("Lớp học phần đã hoàn thành nên giảng viên chỉ được xem. Chỉ Admin mới được sửa điểm.", 403)
+        
         return loi("Lớp học phần chưa bắt đầu nên chưa thể nhập điểm.", 403)
 
     sv_hop_le = {
@@ -1001,8 +1004,14 @@ def api_admin_mon_hoc():
     body = request.get_json(silent=True) or {}
     ma_mon = str(body.get("ma_mon", "")).strip().upper()
     ten_mon = str(body.get("ten_mon", "")).strip()
+
+    so_tc_raw = body.get("so_tin_chi")
+    if so_tc_raw is None or str(so_tc_raw).strip() == "":
+        conn.close()
+        return loi("Vui lòng nhập số tín chỉ.")
+
     try:
-        so_tc = int(body.get("so_tin_chi", 3))
+        so_tc = int(body.get("so_tin_chi", ""))
         ty_le_cc, ty_le_bt, ty_le_gk, ty_le_ck = doc_ty_le(body)
     except (TypeError, ValueError):
         conn.close()
